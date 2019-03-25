@@ -150,10 +150,8 @@ def plot_results(init, max_cost, step ,summary_performance, summary_weights, out
         tnr_protected_list.append(tnr_protected)
         tnr_non_protected_list.append(tnr_non_protected)
 
-    plt.figure()
+    plt.figure(figsize=(20, 20))
     plt.grid(True)
-
-    plt.rcParams["figure.figsize"] = (20, 20)
 
     plt.plot(step_list, accuracy_list, '-b', label='accuracy')
     plt.plot(step_list, auc_list, '-r', label='auc')
@@ -179,10 +177,9 @@ def plot_results(init, max_cost, step ,summary_performance, summary_weights, out
     if not plot_weights:
         return
 
-    plt.figure()
-    plt.grid(True)
 
-    plt.rcParams["figure.figsize"] = (20, 20)
+    plt.figure(figsize=(20, 20))
+    plt.grid(True)
 
     plt.plot(step_list, W_pos_list, '-b', label='Positives')
     plt.plot(step_list, W_neg_list, '-r', label='Negatives')
@@ -203,3 +200,25 @@ def plot_results(init, max_cost, step ,summary_performance, summary_weights, out
 
     plt.savefig(output_dir + "_weights.png")
     # plt.show()
+
+
+
+def plot_calibration_curves(results, names, max_cost, step, directory):
+
+    for num in range(0, max_cost + step, step):
+        plt.figure(figsize=(10, 10))
+        # ax1 = plt.subplot2grid((3, 1), (0, 0), rowspan=2)
+        # ax2 = plt.subplot2grid((3, 1), (2, 0))
+        plt.plot([0, 1], [0, 1], "k:", label="Perfectly calibrated")
+
+        for idx, row in enumerate(results):
+            plt.plot(map(mean, zip(*row.mean_predicted_value[num])), map(mean, zip(*row.fraction_of_positives[num])) , "s-", label="%s" % (names[idx],))
+
+        plt.ylabel("Fraction of positives")
+        plt.legend(loc="best")
+        plt.title('Calibration plots  (reliability curve) for cost = ' + str(num))
+        plt.savefig(directory + "calibration_cost_" + str(num) + ".png")
+        plt.show()
+
+def mean(a):
+    return sum(a) / len(a)
