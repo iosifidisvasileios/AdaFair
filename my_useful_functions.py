@@ -153,7 +153,7 @@ def plot_results(init, max_cost, step ,summary_performance, summary_weights, out
     plt.figure()
     plt.grid(True)
 
-    plt.rcParams["figure.figsize"] = (14, 12)
+    plt.rcParams["figure.figsize"] = (20, 20)
 
     plt.plot(step_list, accuracy_list, '-b', label='accuracy')
     plt.plot(step_list, auc_list, '-r', label='auc')
@@ -163,20 +163,18 @@ def plot_results(init, max_cost, step ,summary_performance, summary_weights, out
     plt.plot(step_list, d_tpr_list, '--', label='dTPR')
     plt.plot(step_list, d_tnr_list, ':', label='dTNR')
 
-    plt.plot(step_list, tpr_protected_list, '-o', label='TPR protected')
-    plt.plot(step_list, tpr_non_protected_list, '-v', label='TPR non-protected')
+    plt.plot(step_list, tpr_protected_list, '-o', label='TPR Prot.')
+    plt.plot(step_list, tpr_non_protected_list, '-v', label='TPR non-Prot.')
 
-    plt.plot(step_list, tnr_protected_list, '-.', label='TNR protected')
-    plt.plot(step_list, tnr_non_protected_list, '-+', label='TNR non-protected')
-    plt.legend(loc='center left', bbox_to_anchor=(0.93, 0.5))
-
+    plt.plot(step_list, tnr_protected_list, '-.', label='TNR Prot.')
+    plt.plot(step_list, tnr_non_protected_list, '-+', label='TNR non-Prot.')
+    plt.legend(loc='best')
 
     plt.xlabel('Cost Increasement (%)')
     plt.ylabel('(%)')
     plt.title(title + " performance")
 
     plt.savefig(output_dir + "_performance.png")
-    # plt.show()
 
     if not plot_weights:
         return
@@ -184,18 +182,17 @@ def plot_results(init, max_cost, step ,summary_performance, summary_weights, out
     plt.figure()
     plt.grid(True)
 
-    plt.rcParams["figure.figsize"] = (14, 12)
+    plt.rcParams["figure.figsize"] = (20, 20)
 
     plt.plot(step_list, W_pos_list, '-b', label='Positives')
     plt.plot(step_list, W_neg_list, '-r', label='Negatives')
 
-    plt.plot(step_list, W_dp_list, '--', label='Protected Positives')
-    plt.plot(step_list, W_fp_list, ':', label='Non-Protected Positives')
+    plt.plot(step_list, W_dp_list, '--', label='Prot. Positives')
+    plt.plot(step_list, W_fp_list, ':', label='Non-Prot. Positives')
 
-    plt.plot(step_list, W_dn_list, '-o', label='Protected Negatives')
-    plt.plot(step_list, W_fn_list, '-+', label='Non-Protected Negatives')
-    plt.legend(loc='center left', bbox_to_anchor=(0.93, 0.5))
-
+    plt.plot(step_list, W_dn_list, '-o', label='Prot. Negatives')
+    plt.plot(step_list, W_fn_list, '-+', label='Non-Prot. Negatives')
+    plt.legend(loc='best')
 
 
     # plt.legend(loc='best')
