@@ -650,6 +650,12 @@ class FairAdaCost(BaseWeightBoosting, ClassifierMixin):
                     else:
                         sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
 
+                elif y[idx] == 1 and y_predict[idx] == 1:
+                    sample_weight[idx] *= self.cost_positive * np.exp(-alpha * max(proba[idx][0], proba[idx][1]))
+                elif y[idx] == -1 and y_predict[idx] == -1:
+                    sample_weight[idx] *= self.cost_negative * np.exp(-alpha * max(proba[idx][0], proba[idx][1]))
+
+
         return sample_weight, alpha, estimator_error, fairness
 
     def predict(self, X):

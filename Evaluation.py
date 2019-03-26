@@ -41,10 +41,23 @@ class my_dict(object):
             self.mean_predicted_value[i] = []
 
 
+def create_temp_files(dataset, increase_cost, max_cost, step, suffixes):
+    for suffix in suffixes:
+        outfile = open(dataset + suffix, 'wb')
+        pickle.dump(my_dict(increase_cost, max_cost, step), outfile)
+        outfile.close()
 
+    if not os.path.exists("Images/"+dataset):
+        os.makedirs("Images/"+dataset)
 
-def run_eval(dataset=None):
+    if not os.path.exists("Images/" + dataset+ "/CalibrationCurves/"):
+        os.makedirs("Images/"+dataset + "/CalibrationCurves/")
 
+def delete_temp_files(dataset, suffixes):
+    for suffix in suffixes:
+        os.remove(dataset + suffix)
+
+def run_eval(dataset, iterations = 5, init_cost = 0, kfold = 10, max_cost = 25, step = 1, num_base_learners = 25):
 
     if dataset == "compass":
         X, y, sa_index, p_Group  = load_compas_data()
@@ -58,121 +71,55 @@ def run_eval(dataset=None):
         X, y, sa_index, p_Group = load_kdd()
     elif dataset == "bank":
         X, y, sa_index, p_Group = load_bank()
+    else:
+        exit(1)
 
     print pd.Series(X[:, sa_index]).value_counts()
+    suffixes = ["_original","_only_costs","_costs_and_votes","_original_calibrated","_only_costs_calibrated","_costs_and_votes_calibrated",]
 
-    iterations = 10
-    increase_cost = 0
-    max_cost = 2
-    step = 1
-    num_base_learners = 25
+    create_temp_files(dataset, init_cost, max_cost, step, suffixes)
 
-
-    original = my_dict(increase_cost, max_cost, step)
-    only_costs = my_dict(increase_cost, max_cost, step)
-    costs_and_votes = my_dict(increase_cost, max_cost, step)
-
-    original_calibrated = my_dict(increase_cost, max_cost, step)
-    only_costs_calibrated = my_dict(increase_cost, max_cost, step)
-    costs_and_votes_calibrated = my_dict(increase_cost, max_cost, step)
-
-    outfile1 = open( dataset+ "_original", 'wb')
-    outfile2 = open( dataset+ "_only_costs", 'wb')
-    outfile3 = open( dataset+ "_costs_and_votes", 'wb')
-
-    outfile4 = open( dataset+ "_only_costs_calibrated", 'wb')
-    outfile5 = open( dataset+ "_costs_and_votes_calibrated", 'wb')
-    outfile6 = open( dataset+ "_original_calibrated", 'wb')
-
-    pickle.dump(original, outfile1)
-    pickle.dump(only_costs, outfile2)
-    pickle.dump(costs_and_votes, outfile3)
-    pickle.dump(only_costs_calibrated, outfile4)
-    pickle.dump(costs_and_votes_calibrated, outfile5)
-    pickle.dump(original_calibrated, outfile6)
-
-    outfile1.close()
-    outfile2.close()
-    outfile3.close()
-    outfile4.close()
-    outfile5.close()
-    outfile6.close()
-
+    threads = []
     mutex = []
     for lock in range (0,6):
         mutex.append(Lock())
-
-    threads = []
-
-    while increase_cost <= max_cost :
-        costs = [1 + increase_cost/100., 1] # [pos , neg]
-        print "cost = " + str(increase_cost) + " out of " + str(max_cost)
+    for cost in range(init_cost, max_cost + step, step):
+    # while init_cost <= max_cost :
+        costs = [1 + cost / 100., 1] # [pos , neg]
+        print "cost = " + str(cost) + " out of " + str(max_cost) + " with step = " + str(step)
         for iter in range(0,iterations):
             start = time.time()
-            kf = StratifiedKFold(n_splits=10, random_state=int(time.time()), shuffle=True)
+            kf = StratifiedKFold(n_splits=kfold, random_state=int(time.time()), shuffle=True)
             for train_index, test_index in kf.split(X,y):
 
                 X_train, X_test = X[train_index], X[test_index]
                 y_train, y_test = y[train_index], y[test_index]
 
                 for proc in range(0,6):
-                    threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index,p_Group, costs, increase_cost, dataset, mutex[proc], num_base_learners, proc)))
+                    threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, costs, cost, dataset, mutex[proc], num_base_learners, proc)))
 
-            for process in threads:
-                process.start()
+        for process in threads:
+            process.start()
 
-            for process in threads:
-                process.join()
+        for process in threads:
+            process.join()
 
-            threads = []
+        threads = []
         print "elapsed time for k-fold iteration = " + str(time.time() - start)
 
-        increase_cost += step
+    results = []
+    for suffix in suffixes:
+        infile = open(dataset + suffix, 'rb')
+        temp_buffer = pickle.load(infile)
+        results.append(temp_buffer)
+        if suffix == "_original" or  suffix == "_only_costs":
+            plot_results(init_cost, max_cost, step, temp_buffer.performance, temp_buffer.weights, "Images/" + dataset + "/" + suffix[1:],"AdaCost" + suffix)
+        else:
+            plot_results(init_cost, max_cost, step, temp_buffer.performance, temp_buffer.weights, "Images/" + dataset + "/" + suffix[1:],"AdaCost" + suffix, False)
+        infile.close()
 
-    infile = open(dataset + "_original", 'rb')
-    original = pickle.load(infile)
-    infile.close()
-
-    infile = open(dataset + "_only_costs", 'rb')
-    only_costs = pickle.load(infile)
-    infile.close()
-
-    infile = open(dataset + "_costs_and_votes", 'rb')
-    costs_and_votes = pickle.load(infile)
-    infile.close()
-
-    # calibrated classifiers
-    infile = open(dataset + "_original_calibrated", 'rb')
-    original_calibrated = pickle.load(infile)
-    infile.close()
-
-    infile = open(dataset + "_only_costs_calibrated", 'rb')
-    only_costs_calibrated = pickle.load(infile)
-    infile.close()
-
-    infile = open(dataset + "_costs_and_votes_calibrated", 'rb')
-    costs_and_votes_calibrated = pickle.load(infile)
-    infile.close()
-
-    if not os.path.exists("Images/"+dataset):
-        os.makedirs("Images/"+dataset)
-
-    if not os.path.exists("Images/" + dataset+ "/CalibrationCurves/"):
-        os.makedirs("Images/"+dataset + "/CalibrationCurves/")
-
-    plot_results(0, max_cost, step, original.performance, original.weights, "Images/"+dataset + "/original", "Original AdaCost")
-    plot_results(0, max_cost, step, only_costs.performance, only_costs.weights, "Images/"+dataset + "/only_costs", "AdaCost with dynamic costs")
-    plot_results(0, max_cost, step, costs_and_votes.performance, costs_and_votes.weights, "Images/"+dataset + "/fully_fair", "AdaCost with dynamic costs and fair votes", False)
-
-    # calibrated
-    plot_results(0, max_cost, step, only_costs_calibrated.performance, only_costs_calibrated.weights, "Images/"+dataset + "/only_costs_calibrated", "AdaCost-Calibrated with dynamic costs", False)
-    plot_results(0, max_cost, step, costs_and_votes_calibrated.performance, costs_and_votes_calibrated.weights, "Images/"+dataset + "/costs_and_votes_calibrated", "AdaCost-Calibrated with dynamic costs and fair votes", False)
-    plot_results(0, max_cost, step, original_calibrated.performance, original_calibrated.weights, "Images/"+dataset + "/original_calibrated", "Original AdaCost-Calibrated", False)
-
-    plot_calibration_curves([original,only_costs, costs_and_votes, only_costs_calibrated, costs_and_votes_calibrated, original_calibrated],
-                            ["AdaCost", "+OnlyCosts" , "+Costs+Votes", "AdaCost_Calibrated", "+OnlyCosts_Calibrated" , "+Costs+Votes_Calibrated" ],
-                            max_cost, step, "Images/"+dataset + "/CalibrationCurves/")
-
+    plot_calibration_curves(results, suffixes,init_cost, max_cost, step, "Images/"+dataset + "/CalibrationCurves/")
+    delete_temp_files(dataset,suffixes)
 
 def train_classifier(X_train, X_test, y_train, y_test, sa_index,p_Group, costs,  increase_cost, dataset, mutex, num_base_learners, mode):
     if mode == 0 or mode == 3:
@@ -183,20 +130,22 @@ def train_classifier(X_train, X_test, y_train, y_test, sa_index,p_Group, costs, 
         classifier = FairAdaCost(saIndex=sa_index, saValue=p_Group, costs=costs, n_estimators=num_base_learners, useFairVoting=True)
 
 
-    classifier.fit(X_train, y_train)
-
     if mode <= 2:
-        y_pred_probs = classifier.decision_function(X_test)
+        classifier.fit(X_train, y_train)
+
+        y_pred_probs = classifier.predict_proba(X_test)[:, 1]
         y_pred_labels = classifier.predict(X_test)
     else:
-        sigmoid = CalibratedClassifierCV(classifier, method='isotonic', cv="prefit")
-        sigmoid.fit(X_train, y_train)
+
+        X_train, X_valid, y_train, y_valid = train_test_split(X_train, y_train, test_size = 0.20)
+        classifier.fit(X_train, y_train)
+        sigmoid = CalibratedClassifierCV(classifier, method='sigmoid', cv="prefit")
+        sigmoid.fit(X_valid, y_valid)
+
         y_pred_probs = sigmoid.predict_proba(X_test)[:, 1]
         y_pred_labels = sigmoid.predict(X_test)
 
-
-    fraction_of_positives, mean_predicted_value = calibration_curve(y_test, y_pred_probs, n_bins=10, normalize=True)
-
+    fraction_of_positives, mean_predicted_value = calibration_curve(y_test, y_pred_probs, n_bins=10)
 
     if mode == 0:
         directory_string = "_original"
@@ -237,5 +186,5 @@ def main(dataset):
     print time.time() - starting
 
 if __name__ == '__main__':
-    # main(sys.argv[1])
-    main("compass")
+    main(sys.argv[1])
+    # main("compass")

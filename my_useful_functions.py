@@ -203,16 +203,16 @@ def plot_results(init, max_cost, step ,summary_performance, summary_weights, out
 
 
 
-def plot_calibration_curves(results, names, max_cost, step, directory):
+def plot_calibration_curves(results, names, init_cost, max_cost, step, directory):
 
-    for num in range(0, max_cost + step, step):
+    for num in range(init_cost, max_cost + step, step):
         plt.figure(figsize=(10, 10))
         # ax1 = plt.subplot2grid((3, 1), (0, 0), rowspan=2)
         # ax2 = plt.subplot2grid((3, 1), (2, 0))
         plt.plot([0, 1], [0, 1], "k:", label="Perfectly calibrated")
 
         for idx, row in enumerate(results):
-            plt.plot(map(mean, zip(*row.mean_predicted_value[num])), map(mean, zip(*row.fraction_of_positives[num])) , "s-", label="%s" % (names[idx],))
+            plt.plot(map(mean, zip(*row.mean_predicted_value[num])), map(mean, zip(*row.fraction_of_positives[num])) , "s-", label="%s" % (names[idx][1:],))
 
         plt.ylabel("Fraction of positives")
         plt.legend(loc="best")

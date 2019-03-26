@@ -110,8 +110,7 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             dtype = None
             accept_sparse = ['csr', 'csc']
 
-        X, y = check_X_y(X, y, accept_sparse=accept_sparse, dtype=dtype,
-                         y_numeric=is_regressor(self))
+        X, y = check_X_y(X, y, accept_sparse=accept_sparse, dtype=dtype, y_numeric=is_regressor(self))
 
         if sample_weight is None:
             # Initialize weights to 1 / n_samples
@@ -134,7 +133,6 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         # Clear any previous fit results
         self.estimators_ = []
         self.estimator_alphas_ = np.zeros(self.n_estimators, dtype=np.float64)
-        # self.estimator_errors_ = np.ones(self.n_estimators, dtype=np.float64)
         self.estimator_fairness_ = np.ones(self.n_estimators, dtype=np.float64)
 
         random_state = check_random_state(self.random_state)
@@ -150,7 +148,6 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             # Early termination
             if sample_weight is None:
                 break
-
 
             self.estimator_alphas_[iboost] = alpha
 
@@ -571,6 +568,10 @@ class AdaCostClassifier(BaseWeightBoosting, ClassifierMixin):
                 elif y[idx] == -1 and y_predict[idx] != -1:
                     # sample_weight[idx] *=  np.exp(self.cost_negative * alpha * ((sample_weight[idx] > 0) | (alpha < 0)))
                     sample_weight[idx] *= self.cost_negative * np.exp(alpha * max(proba[idx][0], proba[idx][1]))
+                elif y[idx] == 1 and y_predict[idx] == 1:
+                    sample_weight[idx] *= self.cost_positive * np.exp(-alpha * max(proba[idx][0], proba[idx][1]))
+                elif y[idx] == -1 and y_predict[idx] == -1:
+                    sample_weight[idx] *= self.cost_negative * np.exp(-alpha * max(proba[idx][0], proba[idx][1]))
 
         return sample_weight, alpha, estimator_error
 
