@@ -57,7 +57,7 @@ def delete_temp_files(dataset, suffixes):
     for suffix in suffixes:
         os.remove(dataset + suffix)
 
-def run_eval(dataset, iterations = 5, init_cost = 0, kfold = 10, max_cost = 25, step = 1, num_base_learners = 25):
+def run_eval(dataset, iterations = 5, init_cost = 0, kfold = 10, max_cost = 200, step = 2, num_base_learners = 25):
 
     if dataset == "compass":
         X, y, sa_index, p_Group  = load_compas_data()
@@ -96,16 +96,16 @@ def run_eval(dataset, iterations = 5, init_cost = 0, kfold = 10, max_cost = 25, 
                 y_train, y_test = y[train_index], y[test_index]
 
                 for proc in range(0,6):
-                    threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, costs, cost, dataset, mutex[proc], num_base_learners, proc)))
+                    threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, costs, cost, dataset, mutex[proc], num_base_learners, proc, "CSB2")))
 
-        for process in threads:
-            process.start()
+            for process in threads:
+                process.start()
 
-        for process in threads:
-            process.join()
+            for process in threads:
+                process.join()
 
-        threads = []
-        print "elapsed time for k-fold iteration = " + str(time.time() - start)
+            threads = []
+            print "elapsed time for k-fold iteration = " + str(time.time() - start)
 
     results = []
     for suffix in suffixes:
@@ -121,22 +121,19 @@ def run_eval(dataset, iterations = 5, init_cost = 0, kfold = 10, max_cost = 25, 
     plot_calibration_curves(results, suffixes,init_cost, max_cost, step, "Images/"+dataset + "/CalibrationCurves/")
     delete_temp_files(dataset,suffixes)
 
-def train_classifier(X_train, X_test, y_train, y_test, sa_index,p_Group, costs,  increase_cost, dataset, mutex, num_base_learners, mode):
+def train_classifier(X_train, X_test, y_train, y_test, sa_index,p_Group, costs,  increase_cost, dataset, mutex, num_base_learners, mode, CSB):
     if mode == 0 or mode == 3:
-        classifier = AdaCostClassifier(saIndex=sa_index, saValue=p_Group, costs=costs, n_estimators=num_base_learners)
+        classifier = AdaCostClassifier(saIndex=sa_index, saValue=p_Group, costs=costs, n_estimators=num_base_learners, updateAll=False, CSB=CSB)
     elif mode == 1 or mode == 4:
-        classifier = FairAdaCost(saIndex=sa_index, saValue=p_Group, costs=costs, n_estimators=num_base_learners)
+        classifier = FairAdaCost(saIndex=sa_index, saValue=p_Group, costs=costs, n_estimators=num_base_learners, updateAll=False, CSB=CSB)
     elif mode == 2 or mode == 5:
-        classifier = FairAdaCost(saIndex=sa_index, saValue=p_Group, costs=costs, n_estimators=num_base_learners, useFairVoting=True)
-
+        classifier = FairAdaCost(saIndex=sa_index, saValue=p_Group, costs=costs, n_estimators=num_base_learners, useFairVoting=True, updateAll=False, CSB=CSB)
 
     if mode <= 2:
         classifier.fit(X_train, y_train)
-
         y_pred_probs = classifier.predict_proba(X_test)[:, 1]
         y_pred_labels = classifier.predict(X_test)
     else:
-
         X_train, X_valid, y_train, y_valid = train_test_split(X_train, y_train, test_size = 0.20)
         classifier.fit(X_train, y_train)
         sigmoid = CalibratedClassifierCV(classifier, method='sigmoid', cv="prefit")
@@ -186,5 +183,5 @@ def main(dataset):
     print time.time() - starting
 
 if __name__ == '__main__':
-    main(sys.argv[1])
-    # main("compass")
+    # main(sys.argv[1])
+    main("compass")
