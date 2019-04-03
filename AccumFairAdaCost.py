@@ -24,24 +24,22 @@ The module structure is the following:
 # License: BSD 3 clause
 
 from abc import ABCMeta, abstractmethod
+import sklearn
 
 import numpy as np
-import sklearn
 from numpy.core.umath_tests import inner1d
 from sklearn.base import is_classifier, ClassifierMixin, is_regressor
 from sklearn.ensemble import BaseEnsemble
 from sklearn.ensemble.forest import BaseForest
 from sklearn.externals import six
 from sklearn.metrics import accuracy_score
-from sklearn.metrics import average_precision_score
 from sklearn.metrics import r2_score
-from sklearn.metrics import roc_auc_score
 from sklearn.tree.tree import BaseDecisionTree, DTYPE, DecisionTreeClassifier
 
 from sklearn.utils.validation import has_fit_parameter, check_is_fitted, check_array, check_X_y, check_random_state
 
 __all__ = [
-    'AdaCostClassifier',
+    'AccumFairAdaCost',
     'AdaBoostRegressor',
 ]
 
@@ -114,7 +112,8 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             dtype = None
             accept_sparse = ['csr', 'csc']
 
-        X, y = check_X_y(X, y, accept_sparse=accept_sparse, dtype=dtype, y_numeric=is_regressor(self))
+        X, y = check_X_y(X, y, accept_sparse=accept_sparse, dtype=dtype,
+                         y_numeric=is_regressor(self))
 
         if sample_weight is None:
             # Initialize weights to 1 / n_samples
@@ -137,6 +136,7 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         # Clear any previous fit results
         self.estimators_ = []
         self.estimator_alphas_ = np.zeros(self.n_estimators, dtype=np.float64)
+        # self.estimator_errors_ = np.ones(self.n_estimators, dtype=np.float64)
         self.estimator_fairness_ = np.ones(self.n_estimators, dtype=np.float64)
 
         random_state = check_random_state(self.random_state)
@@ -144,10 +144,10 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         #     print  "iteration, alpha , positives , negatives , dp , fp , dn , fn"
 
         old_weights_sum = np.sum(sample_weight)
-        # print "training error, training balanced accuracy, training EQ.Odds, testing error, testing balanced accuracy, testing EQ.Odds"
+
         for iboost in range(self.n_estimators):
             # Boosting step
-            sample_weight, alpha, error = self._boost(
+            sample_weight, alpha, error, fairness = self._boost(
                 iboost,
                 X, y,
                 sample_weight,
@@ -157,14 +157,16 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             if sample_weight is None:
                 break
 
+
             self.estimator_alphas_[iboost] = alpha
+            self.estimator_fairness_[iboost] = fairness
 
             # Stop if error is zero
             if error == 0.5:
                 break
 
             new_sample_weight = np.sum(sample_weight)
-            multiplier = old_weights_sum/new_sample_weight
+            multiplier = old_weights_sum / new_sample_weight
 
             # Stop if the sum of sample weights has become non-positive
             if new_sample_weight <= 0:
@@ -174,8 +176,8 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
                 # Normalize
                 sample_weight *= multiplier
 
-            pos, neg, dp,fp,dn,fn = self.calculate_weights(X, y, sample_weight)
 
+            pos, neg, dp,fp,dn,fn = self.calculate_weights(X, y, sample_weight)
             if self.debug:
                 self.weight_list.append(str(iboost) + "," + str(alpha) + "," + str(pos) + ", " + str(neg) + ", " + str(dp) + ", " + str(fp) + ", " + str(dn) + ", " + str(fn))
                 # print str(iboost) + "," + str(alpha) + "," + str(pos) + ", " + str(neg) + ", " + str(dp) + ", " + str(fp) + ", " + str(dn) + ", " + str(fn)
@@ -189,12 +191,10 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
 
             old_weights_sum = np.sum(sample_weight)
 
-
         return self
 
     def get_weights(self,):
         return [self.W_pos, self.W_neg, self.W_dp, self.W_fp, self.W_dn, self.W_fn]
-
 
 
     @abstractmethod
@@ -354,8 +354,81 @@ def _samme_proba(estimator, n_classes, X):
                               * log_proba.sum(axis=1)[:, np.newaxis])
 
 
-class AdaCostClassifier(BaseWeightBoosting, ClassifierMixin):
+class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
+    """An AdaBoost classifier.
 
+    An AdaBoost [1] classifier is a meta-estimator that begins by fitting a
+    classifier on the original dataset and then fits additional copies of the
+    classifier on the same dataset but where the weights of incorrectly
+    classified instances are adjusted such that subsequent classifiers focus
+    more on difficult cases.
+
+    This class implements the algorithm known as AdaBoost-SAMME [2].
+
+    Read more in the :ref:`User Guide <adaboost>`.
+
+    Parameters
+    ----------
+    base_estimator : object, optional (default=DecisionTreeClassifier)
+        The base estimator from which the boosted ensemble is built.
+        Support for sample weighting is required, as well as proper `classes_`
+        and `n_classes_` attributes.
+
+    n_estimators : integer, optional (default=50)
+        The maximum number of estimators at which boosting is terminated.
+        In case of perfect fit, the learning procedure is stopped early.
+
+    learning_rate : float, optional (default=1.)
+        Learning rate shrinks the contribution of each classifier by
+        ``learning_rate``. There is a trade-off between ``learning_rate`` and
+        ``n_estimators``.
+
+    algorithm : {'SAMME', 'SAMME.R'}, optional (default='SAMME.R')
+        If 'SAMME.R' then use the SAMME.R real boosting algorithm.
+        ``base_estimator`` must support calculation of class probabilities.
+        If 'SAMME' then use the SAMME discrete boosting algorithm.
+        The SAMME.R algorithm typically converges faster than SAMME,
+        achieving a lower test error with fewer boosting iterations.
+
+    random_state : int, RandomState instance or None, optional (default=None)
+        If int, random_state is the seed used by the random number generator;
+        If RandomState instance, random_state is the random number generator;
+        If None, the random number generator is the RandomState instance used
+        by `np.random`.
+
+    Attributes
+    ----------
+    estimators_ : list of classifiers
+        The collection of fitted sub-estimators.
+
+    classes_ : array of shape = [n_classes]
+        The classes labels.
+
+    n_classes_ : int
+        The number of classes.
+
+    estimator_weights_ : array of floats
+        Weights for each estimator in the boosted ensemble.
+
+    estimator_errors_ : array of floats
+        Classification error for each estimator in the boosted
+        ensemble.
+
+    feature_importances_ : array of shape = [n_features]
+        The feature importances if supported by the ``base_estimator``.
+
+    See also
+    --------
+    AdaBoostRegressor, GradientBoostingClassifier, DecisionTreeClassifier
+
+    References
+    ----------
+    .. [1] Y. Freund, R. Schapire, "A Decision-Theoretic Generalization of
+           on-Line Learning and an Application to Boosting", 1995.
+
+    .. [2] J. Zhu, H. Zou, S. Rosset, T. Hastie, "Multi-class AdaBoost", 2009.
+
+    """
     def __init__(self,
                  base_estimator=None,
                  n_estimators=50,
@@ -363,40 +436,76 @@ class AdaCostClassifier(BaseWeightBoosting, ClassifierMixin):
                  algorithm='SAMME',
                  random_state=None,
                  saIndex=None,saValue=None,
-                 costs = None, useFairVote=False,updateAll=False, debug=False, CSB="CSB1",
-                 X_test=None, y_test=None):
+                 costs = None, useFairVoting=False,
+                 updateAll=None, debug=False, CSB="CSB2",
+                 X_test=None, y_test=None, decay=True):
 
-        super(AdaCostClassifier, self).__init__(
+        super(AccumFairAdaCost, self).__init__(
             base_estimator=base_estimator,
             n_estimators=n_estimators,
             learning_rate=learning_rate,
             random_state=random_state)
 
-
+        self.cost_positive_final = costs[0]
+        self.cost_negative_final = costs[1]
         self.cost_positive = costs[0]
         self.cost_negative = costs[1]
+        self.useFairVotes= useFairVoting
+
+        self.cost_protected_positive = costs[0]
+        self.cost_non_protected_positive = costs[0]
+
+        self.cost_protected_negative = costs[1]
+        self.cost_non_protected_negative = costs[1]
+        self.decay_cost = decay
 
         self.saIndex = saIndex
         self.saValue = saValue
         self.algorithm = algorithm
-        self.updateAll=updateAll
+        self.updateAll = updateAll
         self.debug = debug
         self.csb = CSB
         self.X_test = X_test
         self.y_test = y_test
 
     def fit(self, X, y, sample_weight=None):
-        return super(AdaCostClassifier, self).fit(X, y, sample_weight)
+        """Build a boosted classifier from the training set (X, y).
+
+        Parameters
+        ----------
+        X : {array-like, sparse matrix} of shape = [n_samples, n_features]
+            The training input samples. Sparse matrix can be CSC, CSR, COO,
+            DOK, or LIL. DOK and LIL are converted to CSR.
+
+        y : array-like of shape = [n_samples]
+            The target values (class labels).
+
+        sample_weight : array-like of shape = [n_samples], optional
+            Sample weights. If None, the sample weights are initialized to
+            ``1 / n_samples``.
+
+        Returns
+        -------
+        self : object
+            Returns self.
+        """
+        # Check that algorithm is supported
+        if self.algorithm not in ('SAMME', 'SAMME.R'):
+            raise ValueError("algorithm %s is not supported" % self.algorithm)
+
+        # Fit
+        return super(AccumFairAdaCost, self).fit(X, y, sample_weight)
 
     def _validate_estimator(self):
         """Check the estimator and set the base_estimator_ attribute."""
-        super(AdaCostClassifier, self)._validate_estimator(default=DecisionTreeClassifier(max_depth=1))
+        super(AccumFairAdaCost, self)._validate_estimator(
+            default=DecisionTreeClassifier(max_depth=1))
 
         #  SAMME-R requires predict_proba-enabled base estimators
         if self.algorithm == 'SAMME.R':
             if not hasattr(self.base_estimator_, 'predict_proba'):
                 raise TypeError(
-                    "AdaCostClassifier with algorithm='SAMME.R' requires "
+                    "AccumFairAdaCost with algorithm='SAMME.R' requires "
                     "that the weak learner supports the calculation of class "
                     "probabilities with a predict_proba method.\n"
                     "Please change the base estimator or set "
@@ -408,28 +517,91 @@ class AdaCostClassifier(BaseWeightBoosting, ClassifierMixin):
     def _boost(self, iboost, X, y, sample_weight, random_state):
         return self._boost_discrete(iboost, X, y, sample_weight, random_state)
 
+    def calculate_fairness(self, data, labels, predictions, iboost):
+
+        tp_protected = 0.
+        tn_protected = 0.
+        fp_protected = 0.
+        fn_protected = 0.
+
+        tp_non_protected = 0.
+        tn_non_protected = 0.
+        fp_non_protected = 0.
+        fn_non_protected = 0.
+        for idx, val in enumerate(data):
+            # protrcted population
+            if val[self.saIndex] == self.saValue:
+                # correctly classified
+                if labels[idx] == predictions[idx]:
+                    if labels[idx] == 1:
+                        tp_protected +=1
+                    else:
+                        tn_protected +=1
+                #misclassified
+                else:
+                    if labels[idx] == 1:
+                        fn_protected +=1
+                    else:
+                        fp_protected +=1
+
+            else:
+                # correctly classified
+                if labels[idx] == predictions[idx]:
+                    if labels[idx] == 1:
+                        tp_non_protected += 1
+                    else:
+                        tn_non_protected += 1
+                # misclassified
+                else:
+                    if labels[idx] == 1:
+                        fn_non_protected += 1
+                    else:
+                        fp_non_protected += 1
+
+
+        tpr_protected = tp_protected/(tp_protected + fn_protected)
+        tnr_protected = tn_protected/(tn_protected + fp_protected)
+
+        tpr_non_protected = tp_non_protected/(tp_non_protected + fn_non_protected)
+        tnr_non_protected = tn_non_protected/(tn_non_protected + fp_non_protected)
+
+        diff_tpr = tpr_non_protected - tpr_protected
+        diff_tnr = tnr_non_protected - tnr_protected
+
+        # if self.decay_cost:
+        #     if iboost >10:
+        #         self.cost_positive = 1
+        #     else:
+        #         self.cost_positive = 1 + ((1 - self.cost_positive_final)/np.exp(iboost))
+
+
+        if diff_tpr > 0:
+            self.cost_protected_positive  = (1 + diff_tpr)*self.cost_positive
+        elif diff_tpr < 0:
+            self.cost_protected_positive = (1 + abs(diff_tpr))*self.cost_positive
+
+        if diff_tnr > 0:
+            self.cost_protected_negative = (1 + diff_tnr)*self.cost_negative
+        elif diff_tpr < 0:
+            self.cost_protected_negative = (1 + abs(diff_tnr))*self.cost_negative
+
+
+        # print "dTPR = " + str((tpr_non_protected - tpr_protected)*100) +", dTNR = " + str((tnr_non_protected - tnr_protected)*100)
+
+        return abs(((tpr_non_protected - tpr_protected)) + abs((tnr_non_protected - tnr_protected)))/2
+        # return 1 - (abs((tpr_non_protected - tpr_protected)) + abs((tnr_non_protected - tnr_protected)))/2
+
     def _boost_discrete(self, iboost, X, y, sample_weight, random_state):
         """Implement a single boost using the SAMME discrete algorithm."""
         estimator = self._make_estimator(random_state=random_state)
         estimator.fit(X, y, sample_weight=sample_weight)
         y_predict = estimator.predict(X)
         proba = estimator.predict_proba(X)
+
         if iboost == 0:
             self.classes_ = getattr(estimator, 'classes_', None)
             self.n_classes_ = len(self.classes_)
         n_classes = self.n_classes_
-
-        misclassified_weights = 0.0
-        #
-        # for idx, row in enumerate(y_predict):
-        #     if row == y [idx]:
-        #         continue
-        #         # misclassified_weights += (sample_weight[idx] * max(proba[idx][0], proba[idx][1]))/len(y)
-        #     else:
-        #         misclassified_weights += (sample_weight[idx] * max(proba[idx][0], proba[idx][1]))/len(y)
-        # print misclassified_weights
-        # alpha = 0.5 * np.log(( 1 - misclassified_weights)/ (misclassified_weights))
-
         incorrect = y_predict != y
 
         # Error fraction
@@ -455,35 +627,17 @@ class AdaCostClassifier(BaseWeightBoosting, ClassifierMixin):
         alpha = self.learning_rate * (
             np.log((1. - estimator_error) / estimator_error) +
             np.log(n_classes - 1.))
-        # Instances incorrectly classified
+
         incorrect = y_predict != y
 
         # Error fraction
-        # estimator_error = np.mean(np.average(incorrect, weights=sample_weight, axis=0))
+        estimator_error = np.mean(np.average(incorrect, weights=sample_weight, axis=0))
 
-        # if self.updateAll:
-        # # Only boost the weights if I will fit again
-        #     if not iboost == self.n_estimators - 1:
-        #         # Only boost positive weights
-        #         for idx, row in enumerate(sample_weight):
-        #             if y[idx] == 1 and y_predict[idx] != 1:
-        #                 sample_weight[idx] *= self.cost_positive * np.exp(alpha )
-        #             elif y[idx] == -1 and y_predict[idx] != -1:
-        #                 sample_weight[idx] *= self.cost_negative * np.exp(alpha )
-        #             elif y[idx] == 1 and y_predict[idx] == 1:
-        #                 sample_weight[idx] *= self.cost_positive * np.exp(-alpha )
-        #             elif y[idx] == -1 and y_predict[idx] == -1:
-        #                 sample_weight[idx] *= self.cost_negative * np.exp(-alpha )
-        # else:
-        #     if not iboost == self.n_estimators - 1:
-        #         # Only boost positive weights
-        #         for idx, row in enumerate(sample_weight):
-        #             if y[idx] == 1 and y_predict[idx] != 1:
-        #                 sample_weight[idx] *= self.cost_positive * np.exp(alpha )
-        #             elif y[idx] == -1 and y_predict[idx] != -1:
-        #                 sample_weight[idx] *= self.cost_negative * np.exp(alpha )
-        
-        
+        if iboost != 0:
+            fairness = self.calculate_fairness(X, y, self.predict(X), iboost)
+        else:
+            fairness = 1
+
         if self.updateAll:
         # Only boost the weights if I will fit again
             if not iboost == self.n_estimators - 1:
@@ -492,25 +646,25 @@ class AdaCostClassifier(BaseWeightBoosting, ClassifierMixin):
                     if y[idx] == 1 and y_predict[idx] != 1:
                         if X[idx][self.saIndex] == self.saValue:
                             if self.csb == "CSB2":
-                                sample_weight[idx] *=  self.cost_positive * np.exp(alpha * max(proba[idx][0], proba[idx][1]))
+                                sample_weight[idx] *=  self.cost_protected_positive * np.exp(alpha * max(proba[idx][0], proba[idx][1]))
                             elif self.csb == "CSB1":
-                                sample_weight[idx] *=  self.cost_positive * np.exp(alpha )
+                                sample_weight[idx] *=  self.cost_protected_positive * np.exp(alpha )
                         else:
                             if self.csb == "CSB2":
-                                sample_weight[idx] *=  self.cost_positive * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
+                                sample_weight[idx] *=  self.cost_non_protected_positive * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
                             elif self.csb == "CSB1":
-                                sample_weight[idx] *=  self.cost_positive * np.exp( alpha )
+                                sample_weight[idx] *=  self.cost_non_protected_positive * np.exp( alpha )
                     elif y[idx] == -1 and y_predict[idx] != -1:
                         if X[idx][self.saIndex] == self.saValue:
                             if self.csb == "CSB2":
-                                sample_weight[idx] *=  self.cost_negative *np.exp( alpha * max(proba[idx][0], proba[idx][1]))
+                                sample_weight[idx] *=  self.cost_protected_negative *np.exp( alpha * max(proba[idx][0], proba[idx][1]))
                             elif self.csb == "CSB1":
-                                sample_weight[idx] *=  self.cost_negative *np.exp( alpha )
+                                sample_weight[idx] *=  self.cost_protected_negative *np.exp( alpha )
                         else:
                             if self.csb == "CSB2":
-                                sample_weight[idx] *= self.cost_negative * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
+                                sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
                             elif self.csb == "CSB1":
-                                sample_weight[idx] *= self.cost_negative * np.exp( alpha )
+                                sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha )
                     elif y[idx] == 1 and y_predict[idx] == 1:
                         if self.csb == "CSB2":
                             sample_weight[idx] *= self.cost_positive * np.exp(-alpha * max(proba[idx][0], proba[idx][1]))
@@ -529,26 +683,26 @@ class AdaCostClassifier(BaseWeightBoosting, ClassifierMixin):
                     if y[idx] == 1 and y_predict[idx] != 1:
                         if X[idx][self.saIndex] == self.saValue:
                             if self.csb == "CSB2":
-                                sample_weight[idx] *=  self.cost_positive * np.exp(alpha * max(proba[idx][0], proba[idx][1]))
+                                sample_weight[idx] *=  self.cost_protected_positive * np.exp(alpha * max(proba[idx][0], proba[idx][1]))
                             elif self.csb == "CSB1":
-                                sample_weight[idx] *=  self.cost_positive * np.exp(alpha )
+                                sample_weight[idx] *=  self.cost_protected_positive * np.exp(alpha )
                         else:
                             if self.csb == "CSB2":
-                                sample_weight[idx] *=  self.cost_positive * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
+                                sample_weight[idx] *=  self.cost_non_protected_positive * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
                             elif self.csb == "CSB1":
-                                sample_weight[idx] *=  self.cost_positive * np.exp( alpha )
+                                sample_weight[idx] *=  self.cost_non_protected_positive * np.exp( alpha )
 
                     elif y[idx] == -1 and y_predict[idx] != -1:
                         if X[idx][self.saIndex] == self.saValue:
                             if self.csb == "CSB2":
-                                sample_weight[idx] *=  self.cost_negative *np.exp( alpha * max(proba[idx][0], proba[idx][1]))
+                                sample_weight[idx] *=  self.cost_protected_negative *np.exp( alpha * max(proba[idx][0], proba[idx][1]))
                             elif self.csb == "CSB1":
-                                sample_weight[idx] *=  self.cost_negative *np.exp( alpha )
+                                sample_weight[idx] *=  self.cost_protected_negative *np.exp( alpha )
                         else:
                             if self.csb == "CSB2":
-                                sample_weight[idx] *= self.cost_negative * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
+                                sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
                             elif self.csb == "CSB1":
-                                sample_weight[idx] *= self.cost_negative * np.exp( alpha )
+                                sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha )
         if self.debug:
             if iboost !=0:
                 y_predict = self.predict(X)
@@ -556,18 +710,19 @@ class AdaCostClassifier(BaseWeightBoosting, ClassifierMixin):
                 incorrect = y_predict != y
                 training_error = np.mean(np.average(incorrect, axis=0))
                 train_auc = sklearn.metrics.balanced_accuracy_score(y, y_predict)
-                train_fairness = self.calculate_fairness(X,y,y_predict)
+                train_fairness = self.calculate_fairness(X,y,y_predict, 1)
 
                 y_predict = self.predict(self.X_test)
                 y_predict_probs = self.decision_function(self.X_test)
                 incorrect = y_predict != self.y_test
                 test_error = np.mean(np.average(incorrect, axis=0))
                 test_auc = sklearn.metrics.balanced_accuracy_score(self.y_test, y_predict)
-                test_fairness = self.calculate_fairness(self.X_test,self.y_test,y_predict)
-                self.performance.append(str(iboost) + "," + str(training_error) + ", " + str(train_auc) + ", " + str(train_fairness) + ","+ str(test_error) + ", " + str(test_auc)+ ", " + str(test_fairness))
+                test_fairness = self.calculate_fairness(self.X_test,self.y_test,y_predict, 1)
+
+                self.performance.append(str(iboost) + "," + str(training_error) + ", " + str(train_auc) + ", " + str(train_fairness) + "," + str(test_error) + ", " + str(test_auc) + ", " + str(test_fairness))
                 # print str(iboost) + "," + str(training_error) + ", " + str(train_auc) + ", " + str(train_fairness) + ","+ str(test_error) + ", " + str(test_auc)+ ", " + str(test_fairness)
 
-        return sample_weight, alpha, estimator_error
+        return sample_weight, alpha, estimator_error, fairness
 
     def get_performance_over_iterations(self):
         return self.performance
@@ -601,13 +756,11 @@ class AdaCostClassifier(BaseWeightBoosting, ClassifierMixin):
 
     def decision_function(self, X):
         """Compute the decision function of ``X``.
-
         Parameters
         ----------
         X : {array-like, sparse matrix} of shape = [n_samples, n_features]
             The training input samples. Sparse matrix can be CSC, CSR, COO,
             DOK, or LIL. DOK and LIL are converted to CSR.
-
         Returns
         -------
         score : array, shape = [n_samples, k]
@@ -624,8 +777,12 @@ class AdaCostClassifier(BaseWeightBoosting, ClassifierMixin):
         n_classes = self.n_classes_
         classes = self.classes_[:, np.newaxis]
 
-        pred = sum((estimator.predict(X) == classes).T * w for estimator, w in zip(self.estimators_, self.estimator_alphas_))
-
+        if self.useFairVotes:
+            # pred = sum(estimator.predict_proba(X) * w * f for estimator, w, f in zip(self.estimators_, self.estimator_alphas_, self.estimator_fairness_))
+            pred = sum((estimator.predict(X)== classes).T * w * f for estimator, w, f in zip(self.estimators_, self.estimator_alphas_, self.estimator_fairness_))
+        else:
+            pred = sum((estimator.predict(X)== classes).T * w  for estimator, w in zip(self.estimators_, self.estimator_alphas_))
+            # pred = sum(estimator.predict_proba(X) * w for estimator, w,  in zip(self.estimators_, self.estimator_alphas_))
         pred /= self.estimator_alphas_.sum()
         if n_classes == 2:
             pred[:, 0] *= -1
@@ -659,14 +816,10 @@ class AdaCostClassifier(BaseWeightBoosting, ClassifierMixin):
         if n_classes == 1:
             return np.ones((X.shape[0], 1))
 
-        if self.algorithm == 'SAMME.R':
-            # The weights are all 1. for SAMME.R
-            proba = sum(_samme_proba(estimator, n_classes, X)
-                        for estimator in self.estimators_)
-        else:   # self.algorithm == "SAMME"
-            proba = sum(estimator.predict_proba(X) * w
-                        for estimator, w in zip(self.estimators_,
-                                                self.estimator_alphas_))
+        if self.useFairVotes:
+            proba = sum(estimator.predict_proba(X) * w * f for estimator, w, f in zip(self.estimators_,self.estimator_alphas_, self.estimator_fairness_))
+        else:
+            proba = sum(estimator.predict_proba(X) * w for estimator, w in zip(self.estimators_,self.estimator_alphas_))
 
         proba /= self.estimator_alphas_.sum()
         proba = np.exp((1. / (n_classes - 1)) * proba)
@@ -697,66 +850,4 @@ class AdaCostClassifier(BaseWeightBoosting, ClassifierMixin):
         """
         return np.log(self.predict_proba(X))
 
-    def calculate_fairness(self, data, labels, predictions):
 
-        tp_protected = 0.
-        tn_protected = 0.
-        fp_protected = 0.
-        fn_protected = 0.
-
-        tp_non_protected = 0.
-        tn_non_protected = 0.
-        fp_non_protected = 0.
-        fn_non_protected = 0.
-        for idx, val in enumerate(data):
-            # protrcted population
-            if val[self.saIndex] == self.saValue:
-                # correctly classified
-                if labels[idx] == predictions[idx]:
-                    if labels[idx] == 1:
-                        tp_protected += 1
-                    else:
-                        tn_protected += 1
-                # misclassified
-                else:
-                    if labels[idx] == 1:
-                        fn_protected += 1
-                    else:
-                        fp_protected += 1
-
-            else:
-                # correctly classified
-                if labels[idx] == predictions[idx]:
-                    if labels[idx] == 1:
-                        tp_non_protected += 1
-                    else:
-                        tn_non_protected += 1
-                # misclassified
-                else:
-                    if labels[idx] == 1:
-                        fn_non_protected += 1
-                    else:
-                        fp_non_protected += 1
-
-        tpr_protected = tp_protected / (tp_protected + fn_protected)
-        tnr_protected = tn_protected / (tn_protected + fp_protected)
-
-        tpr_non_protected = tp_non_protected / (tp_non_protected + fn_non_protected)
-        tnr_non_protected = tn_non_protected / (tn_non_protected + fp_non_protected)
-
-        diff_tpr = tpr_non_protected - tpr_protected
-        diff_tnr = tnr_non_protected - tnr_protected
-
-        if diff_tpr > 0:
-            self.cost_protected_positive = (1 + diff_tpr) * self.cost_positive
-        elif diff_tpr < 0:
-            self.cost_protected_positive = (1 + abs(diff_tpr)) * self.cost_positive
-
-        if diff_tnr > 0:
-            self.cost_protected_negative = (1 + diff_tnr) * self.cost_negative
-        elif diff_tpr < 0:
-            self.cost_protected_negative = (1 + abs(diff_tnr)) * self.cost_negative
-
-        # print "dTPR = " + str((tpr_non_protected - tpr_protected)*100) +", dTNR = " + str((tnr_non_protected - tnr_protected)*100)
-
-        return 1 - (abs((tpr_non_protected - tpr_protected)) + abs((tnr_non_protected - tnr_protected)))/2

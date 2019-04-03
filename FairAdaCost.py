@@ -24,6 +24,7 @@ The module structure is the following:
 # License: BSD 3 clause
 
 from abc import ABCMeta, abstractmethod
+import sklearn
 
 import numpy as np
 from numpy.core.umath_tests import inner1d
@@ -69,7 +70,7 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         self.W_fp = 0.
         self.W_dn = 0.
         self.W_fn = 0.
-
+        self.performance = []
         self.learning_rate = learning_rate
         self.random_state = random_state
 
@@ -98,6 +99,7 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             Returns self.
         """
         # Check parameters
+        self.weight_list = []
         if self.learning_rate <= 0:
             raise ValueError("learning_rate must be greater than zero")
 
@@ -138,8 +140,8 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         self.estimator_fairness_ = np.ones(self.n_estimators, dtype=np.float64)
 
         random_state = check_random_state(self.random_state)
-        if self.debug:
-            print  "alpha , positives , negatives , dp , fp , dn , fn"
+        # if self.debug:
+        #     print  "iteration, alpha , positives , negatives , dp , fp , dn , fn"
 
         old_weights_sum = np.sum(sample_weight)
 
@@ -177,7 +179,8 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
 
             pos, neg, dp,fp,dn,fn = self.calculate_weights(X, y, sample_weight)
             if self.debug:
-                print str(alpha) + "," + str(pos) + ", " + str(neg) + ", " + str(dp) + ", " + str(fp) + ", " + str(dn) + ", " + str(fn)
+                self.weight_list.append(str(iboost) + "," + str(alpha) + "," + str(pos) + ", " + str(neg) + ", " + str(dp) + ", " + str(fp) + ", " + str(dn) + ", " + str(fn))
+                # print str(iboost) + "," + str(alpha) + "," + str(pos) + ", " + str(neg) + ", " + str(dp) + ", " + str(fp) + ", " + str(dn) + ", " + str(fn)
 
             self.W_pos += pos/self.n_estimators
             self.W_neg += neg/self.n_estimators
@@ -434,7 +437,8 @@ class FairAdaCost(BaseWeightBoosting, ClassifierMixin):
                  random_state=None,
                  saIndex=None,saValue=None,
                  costs = None, useFairVoting=False,
-                 updateAll=None, debug=False, CSB="CSB1"):
+                 updateAll=None, debug=False, CSB="CSB2",
+                 X_test=None, y_test=None):
 
         super(FairAdaCost, self).__init__(
             base_estimator=base_estimator,
@@ -458,6 +462,8 @@ class FairAdaCost(BaseWeightBoosting, ClassifierMixin):
         self.updateAll = updateAll
         self.debug = debug
         self.csb = CSB
+        self.X_test = X_test
+        self.y_test = y_test
 
     def fit(self, X, y, sample_weight=None):
         """Build a boosted classifier from the training set (X, y).
@@ -573,7 +579,8 @@ class FairAdaCost(BaseWeightBoosting, ClassifierMixin):
 
         # print "dTPR = " + str((tpr_non_protected - tpr_protected)*100) +", dTNR = " + str((tnr_non_protected - tnr_protected)*100)
 
-        return 1 - (abs((tpr_non_protected - tpr_protected)) + abs((tnr_non_protected - tnr_protected)))/2
+        return (abs((tpr_non_protected - tpr_protected)) + abs((tnr_non_protected - tnr_protected)))/2
+        # return 1 - (abs((tpr_non_protected - tpr_protected)) + abs((tnr_non_protected - tnr_protected)))/2
 
     def _boost_discrete(self, iboost, X, y, sample_weight, random_state):
         """Implement a single boost using the SAMME discrete algorithm."""
@@ -612,17 +619,6 @@ class FairAdaCost(BaseWeightBoosting, ClassifierMixin):
             np.log((1. - estimator_error) / estimator_error) +
             np.log(n_classes - 1.))
 
-        #
-        # misclassified_weights = 0.0
-        # for idx, row in enumerate(y_predict):
-        #     if row == y [idx]:
-        #         misclassified_weights += (sample_weight[idx] * max(proba[idx][0], proba[idx][1]))/len(y)
-        #     else:
-        #         misclassified_weights -= (sample_weight[idx] * max(proba[idx][0], proba[idx][1]))/len(y)
-        #
-        # alpha = 0.5 * np.log(( 1 + misclassified_weights)/ (1 - misclassified_weights))
-
-        # Instances incorrectly classified
         incorrect = y_predict != y
 
         # Error fraction
@@ -694,8 +690,32 @@ class FairAdaCost(BaseWeightBoosting, ClassifierMixin):
                                 sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
                             elif self.csb == "CSB1":
                                 sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha )
+        if self.debug:
+            if iboost !=0:
+                y_predict = self.predict(X)
+                y_predict_probs = self.decision_function(X)
+                incorrect = y_predict != y
+                training_error = np.mean(np.average(incorrect, axis=0))
+                train_auc = sklearn.metrics.balanced_accuracy_score(y, y_predict)
+                train_fairness = self.calculate_fairness(X,y,y_predict)
+
+                y_predict = self.predict(self.X_test)
+                y_predict_probs = self.decision_function(self.X_test)
+                incorrect = y_predict != self.y_test
+                test_error = np.mean(np.average(incorrect, axis=0))
+                test_auc = sklearn.metrics.balanced_accuracy_score(self.y_test, y_predict)
+                test_fairness = self.calculate_fairness(self.X_test,self.y_test,y_predict)
+
+                self.performance.append(str(iboost) + "," + str(training_error) + ", " + str(train_auc) + ", " + str(train_fairness) + "," + str(test_error) + ", " + str(test_auc) + ", " + str(test_fairness))
+                # print str(iboost) + "," + str(training_error) + ", " + str(train_auc) + ", " + str(train_fairness) + ","+ str(test_error) + ", " + str(test_auc)+ ", " + str(test_fairness)
 
         return sample_weight, alpha, estimator_error, fairness
+
+    def get_performance_over_iterations(self):
+        return self.performance
+
+    def get_weights_over_iterations(self):
+        return self.weight_list
 
     def predict(self, X):
         """Predict classes for X.

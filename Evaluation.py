@@ -57,7 +57,7 @@ def delete_temp_files(dataset, suffixes):
     for suffix in suffixes:
         os.remove(dataset + suffix)
 
-def run_eval(dataset, iterations = 5, init_cost = 0, kfold = 10, max_cost = 200, step = 2, num_base_learners = 25):
+def run_eval(dataset, iterations = 15, init_cost = 0, kfold = 5, max_cost = 5, step = 1, num_base_learners = 10):
 
     if dataset == "compass":
         X, y, sa_index, p_Group  = load_compas_data()
@@ -96,16 +96,16 @@ def run_eval(dataset, iterations = 5, init_cost = 0, kfold = 10, max_cost = 200,
                 y_train, y_test = y[train_index], y[test_index]
 
                 for proc in range(0,6):
-                    threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, costs, cost, dataset, mutex[proc], num_base_learners, proc, "CSB2")))
+                    threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, costs, cost, dataset, mutex[proc], num_base_learners, proc, "CSB1")))
 
-            for process in threads:
-                process.start()
+        for process in threads:
+            process.start()
 
-            for process in threads:
-                process.join()
+        for process in threads:
+            process.join()
 
-            threads = []
-            print "elapsed time for k-fold iteration = " + str(time.time() - start)
+        threads = []
+        print "elapsed time for k-fold iteration = " + str(time.time() - start)
 
     results = []
     for suffix in suffixes:
@@ -184,4 +184,4 @@ def main(dataset):
 
 if __name__ == '__main__':
     # main(sys.argv[1])
-    main("compass")
+    main("adult-gender")
