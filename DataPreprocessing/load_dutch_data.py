@@ -41,6 +41,7 @@ def load_dutch_data():
 
 	""" Feature normalization and one hot encoding """
 	y = data[CLASS_FEATURE]
+	y[y==0] = -1
 
 	print collections.Counter(data["sex"])
 
@@ -48,7 +49,6 @@ def load_dutch_data():
 	print pd.Series(y).value_counts()
 	print "\n"
 	# convert class label 0 to -1
-	y[y==0] = -1
 
 
 
@@ -111,8 +111,4 @@ def load_dutch_data():
 	# print "Features we will be using for classification are:", feature_names, "\n"
 	# print x_control
 
-	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0
-
-	# Data_type = 1
-	# X, y, x_control = load_adult_data()
-	# sensitive_attrs = x_control.keys()
+	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0, x_control

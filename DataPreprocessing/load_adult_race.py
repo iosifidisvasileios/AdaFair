@@ -18,12 +18,10 @@ np.random.seed(SEED)
 
 
 def load_adult_race():
-	FEATURES_CLASSIFICATION = ["workclass", "education", "Maritial-status", "occupation", "race", "sex", "country",
-							   "age", "fnlwgt", "Capital-gain", "Capital-loss",
-							   "Hours-per-week"]  # features to be used for classification
-	CONT_VARIABLES = ["age", "fnlwgt", "Capital-gain", "Capital-loss",
-					  "Hours-per-week"]  # continuous features, will need to be handled separately from categorical features, categorical features will be encoded using one-hot
-	CLASS_FEATURE = "Class-label"  # the decision variable
+
+	FEATURES_CLASSIFICATION = ["workclass", "education", "Maritial-status", "occupation", "race", "sex", "country","age", "Capital-gain","Capital-loss","Hours-per-week"] #features to be used for classification
+	CONT_VARIABLES = ["age", "Capital-gain","Capital-loss","Hours-per-week"] # continuous features, will need to be handled separately from categorical features, categorical features will be encoded using one-hot
+	CLASS_FEATURE = "Class-label" # the decision variable
 	SENSITIVE_ATTRS = ["race"]
 
 
@@ -110,7 +108,7 @@ def load_adult_race():
 	# print "Features we will be using for classification are:", feature_names, "\n"
 	# print x_control
 
-	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0
+	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0, x_control
 
 # Data_type = 1
 # X, y, x_control = load_adult_data()

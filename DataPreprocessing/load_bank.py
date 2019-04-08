@@ -112,7 +112,8 @@ def load_bank():
 	print "Features we will be using for classification are:", feature_names, "\n"
 	# print x_control
 
-	return X, y, feature_names.index(SENSITIVE_ATTRS[0]),0
+	# return X, y, feature_names.index(SENSITIVE_ATTRS[0]),0
+	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0, x_control
 
 # Data_type = 1
 # X, y, x_control = load_bank()

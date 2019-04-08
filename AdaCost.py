@@ -363,7 +363,7 @@ class AdaCostClassifier(BaseWeightBoosting, ClassifierMixin):
                  algorithm='SAMME',
                  random_state=None,
                  saIndex=None,saValue=None,
-                 costs = None, useFairVote=False,updateAll=False, debug=False, CSB="CSB1",
+                 costs = [1, 1], useFairVote=False,updateAll=False, debug=False, CSB="CSB1",
                  X_test=None, y_test=None):
 
         super(AdaCostClassifier, self).__init__(

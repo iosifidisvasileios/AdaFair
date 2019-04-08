@@ -42,7 +42,7 @@ def load_compas_data():
 	FEATURES_CLASSIFICATION = ["age_cat", "race", "sex", "priors_count", "c_charge_degree"] #features to be used for classification
 	CONT_VARIABLES = ["priors_count"] # continuous features, will need to be handled separately from categorical features, categorical features will be encoded using one-hot
 	CLASS_FEATURE = "two_year_recid" # the decision variable
-	SENSITIVE_ATTRS = ["race"]
+	SENSITIVE_ATTRS = ["sex"]
 
 
 	# COMPAS_INPUT_FILE = "compas-scores-two-years.csv"
@@ -84,7 +84,7 @@ def load_compas_data():
 
 
 
-	print collections.Counter(data["race"])
+	print collections.Counter(data["sex"])
 
 	test = pd.DataFrame.from_dict(data)
 	# print test
@@ -164,5 +164,5 @@ def load_compas_data():
 	# pd.DataFrame(X).to_csv("test_compas_X.csv")
 	# pd.DataFrame(y).to_csv("test_compas_y.csv")
 
-	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0
+	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0, x_control
 

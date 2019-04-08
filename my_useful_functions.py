@@ -1,12 +1,15 @@
 import matplotlib
-matplotlib.use("Pdf")
+matplotlib.use('Agg')
+from sklearn.metrics import balanced_accuracy_score
+
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import average_precision_score
 from sklearn.metrics import roc_auc_score
 import numpy
 import matplotlib.pyplot as plt
 
-def calculate_fairness(data, labels, predictions, probs, saIndex, saValue):
+
+def calculate_performance(data, labels, predictions, probs, saIndex, saValue):
     tp_protected = 0.
     tn_protected = 0.
     fp_protected = 0.
@@ -62,18 +65,20 @@ def calculate_fairness(data, labels, predictions, probs, saIndex, saValue):
 
     output = dict()
 
-    output["average_precision"] = average_precision_score(labels, predictions)
+    output["balanced_accuracy"] = balanced_accuracy_score(labels, predictions)
     output["accuracy"] = accuracy_score(labels, predictions)
-    output["auc"] = roc_auc_score(labels, probs)
-    output["dTPR"] = tpr_non_protected - tpr_protected
-    output["dTNR"] = tnr_non_protected - tnr_protected
+    # output["dTPR"] = tpr_non_protected - tpr_protected
+    # output["dTNR"] = tnr_non_protected - tnr_protected
+    output["fairness"] = abs(tpr_non_protected - tpr_protected) + abs(tnr_non_protected - tnr_protected)
+
     output["TPR_protected"] = tpr_protected
     output["TPR_non_protected"] = tpr_non_protected
     output["TNR_protected"] = tnr_protected
     output["TNR_non_protected"] = tnr_non_protected
     return output
 
-def plot_results(init, max_cost, step ,summary_performance, summary_weights, output_dir,title, plot_weights=True):
+
+def plot_results(init, max_cost, step, summary_performance, summary_weights, output_dir, title, plot_weights=True):
     step_list = []
     accuracy_list = []
     auc_list = []
@@ -105,7 +110,7 @@ def plot_results(init, max_cost, step ,summary_performance, summary_weights, out
 
         accuracy = 0
         auc = 0
-        average_precision= 0
+        average_precision = 0
         d_tpr = 0
         d_tnr = 0
         tpr_protected = 0
@@ -177,7 +182,6 @@ def plot_results(init, max_cost, step ,summary_performance, summary_weights, out
     if not plot_weights:
         return
 
-
     plt.figure(figsize=(20, 20))
     plt.grid(True)
 
@@ -191,7 +195,6 @@ def plot_results(init, max_cost, step ,summary_performance, summary_weights, out
     plt.plot(step_list, W_fn_list, '-+', label='Non-Prot. Negatives')
     plt.legend(loc='best')
 
-
     # plt.legend(loc='best')
 
     plt.xlabel('Cost Increasement (%)')
@@ -202,9 +205,85 @@ def plot_results(init, max_cost, step ,summary_performance, summary_weights, out
     # plt.show()
 
 
+def plot_my_results(results, names, output_dir, dataset):
+    accuracy_list = []
+    balanced_accuracy_list = []
+    fairness_list = []
+    tpr_protected_list = []
+    tpr_non_protected_list = []
+    tnr_protected_list = []
+    tnr_non_protected_list = []
+    std_accuracy_list = []
+    std_balanced_accuracy_list = []
+    std_fairness_list = []
+    std_tpr_protected_list = []
+    std_tpr_non_protected_list = []
+    std_tnr_protected_list = []
+    std_tnr_non_protected_list = []
+
+    for list_of_results in results:
+
+        accuracy = []
+        balanced_accuracy = []
+        fairness = []
+        tpr_protected = []
+        tpr_non_protected = []
+        tnr_protected = []
+        tnr_non_protected = []
+
+        for item in list_of_results:
+            accuracy.append(item["accuracy"])
+            balanced_accuracy.append(item["balanced_accuracy"])
+            fairness.append(item["fairness"])
+            tpr_protected.append(item["TPR_protected"])
+            tpr_non_protected.append(item["TPR_non_protected"])
+            tnr_protected.append(item["TNR_protected"])
+            tnr_non_protected.append(item["TNR_non_protected"])
+
+        numpy.mean(accuracy)
+        numpy.std(accuracy)
+
+        accuracy_list.append(numpy.mean(accuracy))
+        balanced_accuracy_list.append(numpy.mean(balanced_accuracy))
+        fairness_list.append(numpy.mean(fairness))
+        tpr_protected_list.append(numpy.mean(tpr_protected))
+        tpr_non_protected_list.append(numpy.mean(tpr_non_protected))
+        tnr_protected_list.append(numpy.mean(tnr_protected))
+        tnr_non_protected_list.append(numpy.mean(tnr_non_protected))
+
+        std_accuracy_list.append(numpy.std(accuracy))
+        std_balanced_accuracy_list.append(numpy.std(balanced_accuracy))
+        std_fairness_list.append(numpy.std(fairness))
+        std_tpr_protected_list.append(numpy.std(tpr_protected))
+        std_tpr_non_protected_list.append(numpy.std(tpr_non_protected))
+        std_tnr_protected_list.append(numpy.std(tnr_protected))
+        std_tnr_non_protected_list.append(numpy.std(tnr_non_protected))
+
+    plt.figure(figsize=(18, 14))
+    plt.grid(True)
+    index = numpy.arange(7)
+    bar_width = 0.10
+    # plt.xticks(index + bar_width / 2,
+    #            ('accuracy', 'balanced_accuracy', 'fairness', 'TPR_P', 'TPR_N_P', 'TNR_P', 'TNR_N_P'))
+    plt.xticks(index + bar_width / 2,
+               ('accuracy', 'balanced_accuracy', 'fairness', 'TPR_P', 'TPR_N_P', 'TNR_P', 'TNR_N_P'))
+
+    for i in range(0, len(names)):
+        plt.bar(index + bar_width * i,
+                [accuracy_list[i], balanced_accuracy_list[i], fairness_list[i], tpr_protected_list[i],
+                 tpr_non_protected_list[i], tnr_protected_list[i], tnr_non_protected_list[i]], bar_width,
+                yerr=[std_accuracy_list[i], std_balanced_accuracy_list[i], std_fairness_list[i],
+                      std_tpr_protected_list[i], std_tpr_non_protected_list[i], std_tnr_protected_list[i],
+                      std_tnr_non_protected_list[i]],
+                label=names[i])
+
+    plt.legend()
+    plt.ylabel('(%)')
+    plt.title("Performance for " + dataset)
+    plt.savefig(output_dir + "_performance.png")
+
 
 def plot_calibration_curves(results, names, init_cost, max_cost, step, directory):
-
     for num in range(init_cost, max_cost + step, step):
         plt.figure(figsize=(10, 10))
         # ax1 = plt.subplot2grid((3, 1), (0, 0), rowspan=2)
@@ -212,13 +291,15 @@ def plot_calibration_curves(results, names, init_cost, max_cost, step, directory
         plt.plot([0, 1], [0, 1], "k:", label="Perfectly calibrated")
 
         for idx, row in enumerate(results):
-            plt.plot(map(mean, zip(*row.mean_predicted_value[num])), map(mean, zip(*row.fraction_of_positives[num])) , "s-", label="%s" % (names[idx][1:],))
+            plt.plot(map(mean, zip(*row.mean_predicted_value[num])), map(mean, zip(*row.fraction_of_positives[num])),
+                     "s-", label="%s" % (names[idx][1:],))
 
         plt.ylabel("Fraction of positives")
         plt.legend(loc="best")
         plt.title('Calibration plots  (reliability curve) for cost = ' + str(num))
         plt.savefig(directory + "calibration_cost_" + str(num) + ".png")
         plt.show()
+
 
 def mean(a):
     return sum(a) / len(a)
