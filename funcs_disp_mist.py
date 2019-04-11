@@ -15,7 +15,7 @@ from osqp import OSQP
 
 import utils as ut
 
-SEED = 1122334455
+SEED = int(time.time())
 seed(SEED) # set the random seed so that the random permutations can be reproduced again
 np.random.seed(SEED)
 
@@ -58,8 +58,8 @@ def train_model_disp_mist(x, y, x_control, loss_function, EPS, cons_params=None)
 
     """
 
-    max_iters = 200 # for the convex program
-    max_iter_dccp = 50  # for the dccp algo
+    max_iters = 300 # for the convex program
+    max_iter_dccp = 100  # for the dccp algo
 
 
     num_points, num_features = x.shape
@@ -108,7 +108,7 @@ def train_model_disp_mist(x, y, x_control, loss_function, EPS, cons_params=None)
     prob.solve(method='dccp', tau=tau, mu=mu, tau_max=1e10,
                solver=ECOS, verbose=False,
                feastol=EPS, abstol=EPS, reltol=EPS, feastol_inacc=EPS, abstol_inacc=EPS, reltol_inacc=EPS,
-               max_iters=max_iters, max_iter=max_iter_dccp, parallel=True)
+               max_iters=max_iters, max_iter=max_iter_dccp)
 
     assert (prob.status == "Converged" or prob.status == "optimal")
     # print "Optimization done, problem status:", prob.status
@@ -173,7 +173,7 @@ def get_clf_stats(w, x_train, y_train, x_control_train, x_test, y_test, x_contro
 
 
     train_score, accuracy, correct_answers_train, balanced_acc  = ut.check_accuracy(None, x_train, y_train, x_test, y_test, all_class_labels_assigned_train, all_class_labels_assigned_test)
-    auc = ut.check_auc(None, x_train, y_train, x_test, y_test, all_class_labels_assigned_train, all_class_labels_assigned_test)
+    # auc = ut.check_auc(None, x_train, y_train, x_test, y_test, all_class_labels_assigned_train, all_class_labels_assigned_test)
 
 
     cov_all_train = {}
@@ -469,79 +469,4 @@ def get_sensitive_attr_constraint_fpr_fnr_cov(model, x_arr, y_arr_true, y_arr_di
             print "Covariance for type '%s' is: %0.7f" %(cov_type_name, cov)
 
     return cons_sum_dict
-
-
-def plot_fairness_acc_tradeoff(x_all, y_all, x_control_all, loss_function, cons_type):
-
-
-    # very the covariance threshold using a range of decreasing multiplicative factors and see the tradeoffs between accuracy and fairness
-    it = 0.2
-    mult_range = np.arange(1.0, 0.0-it, -it).tolist()
-
-
-
-
-    positive_class_label = 1 # positive class is +1
-    test_acc = []
-
-
-    # first get the original values of covariance in the unconstrained classifier -- these original values are not needed for reverse constraint
-    test_acc_arr, train_acc_arr, correlation_dict_test_arr, correlation_dict_train_arr, cov_dict_test_arr, cov_dict_train_arr = compute_cross_validation_error(x_all, y_all, x_control_all, num_folds, loss_function, 0, apply_accuracy_constraint, sep_constraint, sensitive_attrs, [{} for i in range(0,num_folds)], 0)
-
-    for c in cov_range:
-        print "LOG: testing for multiplicative factor: %0.2f" % c
-        sensitive_attrs_to_cov_original_arr_multiplied = []
-        for sensitive_attrs_to_cov_original in cov_dict_train_arr:
-            sensitive_attrs_to_cov_thresh = deepcopy(sensitive_attrs_to_cov_original)
-            for k in sensitive_attrs_to_cov_thresh.keys():
-                v = sensitive_attrs_to_cov_thresh[k]
-                if type(v) == type({}):
-                    for k1 in v.keys():
-                        v[k1] = v[k1] * c
-                else:
-                    sensitive_attrs_to_cov_thresh[k] = v * c
-            sensitive_attrs_to_cov_original_arr_multiplied.append(sensitive_attrs_to_cov_thresh)
-
-
-        test_acc_arr, train_acc_arr, correlation_dict_test_arr, correlation_dict_train_arr, cov_dict_test_arr, cov_dict_train_arr  = compute_cross_validation_error(x_all, y_all, x_control_all, num_folds, loss_function, apply_fairness_constraints, apply_accuracy_constraint, sep_constraint, sensitive_attrs, sensitive_attrs_to_cov_original_arr_multiplied, c)
-        test_acc.append(np.mean(test_acc_arr))
-
-
-        correlation_dict_train = get_avg_correlation_dict(correlation_dict_train_arr)
-        correlation_dict_test = get_avg_correlation_dict(correlation_dict_test_arr)
-
-        # just plot the correlations for the first sensitive attr, the plotting can be extended for the other values, but as a proof of concept, we will jsut show for one
-        s = sensitive_attrs[0]
-
-        for k,v in correlation_dict_test[s].items():
-            if v.get(positive_class_label) is None:
-                positive_per_category[k].append(0.0)
-            else:
-                positive_per_category[k].append(v[positive_class_label])
-
-    positive_per_category = dict(positive_per_category)
-
-    p_rule_arr = (np.array(positive_per_category[0]) / np.array(positive_per_category[1])) * 100.0
-
-
-    ax = plt.subplot(2,1,1)
-    plt.plot(cov_range, positive_per_category[0], "-o" , color="green", label = "Protected")
-    plt.plot(cov_range, positive_per_category[1], "-o", color="blue", label = "Non-protected")
-    ax.set_xlim([min(cov_range), max(cov_range)])
-    plt.xlabel('Multiplicative loss factor')
-    plt.ylabel('Perc. in positive class')
-    if apply_accuracy_constraint == False:
-        plt.gca().invert_xaxis()
-        plt.xlabel('Multiplicative covariance factor (c)')
-    ax.legend()
-
-    ax = plt.subplot(2,1,2)
-    plt.scatter(p_rule_arr, test_acc, color="red")
-    ax.set_xlim([min(p_rule_arr), max(max(p_rule_arr), 100)])
-    plt.xlabel('P% rule')
-    plt.ylabel('Accuracy')
-
-    plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.5)
-    plt.show()
-
 

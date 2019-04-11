@@ -37,12 +37,12 @@ def check_data_file(fname):
         print "File found in current directory.."
     
 
-def load_compas_data():
+def load_compas(sa):
 
 	FEATURES_CLASSIFICATION = ["age_cat", "race", "sex", "priors_count", "c_charge_degree"] #features to be used for classification
 	CONT_VARIABLES = ["priors_count"] # continuous features, will need to be handled separately from categorical features, categorical features will be encoded using one-hot
 	CLASS_FEATURE = "two_year_recid" # the decision variable
-	SENSITIVE_ATTRS = ["sex"]
+	SENSITIVE_ATTRS = [sa]
 
 
 	# COMPAS_INPUT_FILE = "compas-scores-two-years.csv"
@@ -154,15 +154,9 @@ def load_compas_data():
 	for k in x_control.keys():
 		x_control[k] = x_control[k][perm]
 
-	# b[:, :-1] = a
-
-	# X = ut.add_intercept(X)
-	# feature_names = ["intercept"] + feature_names
 	print "Features we will be using for classification are:", feature_names, "\n"
-	# assert(len(feature_names) == X.shape[1])
 
-	# pd.DataFrame(X).to_csv("test_compas_X.csv")
-	# pd.DataFrame(y).to_csv("test_compas_y.csv")
-
-	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0, x_control
-
+	if sa == "race":
+		return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 1, x_control
+	elif sa== "sex":
+		return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0, x_control

@@ -2,6 +2,9 @@ import cvxpy as cvx
 import numpy as np
 from collections import namedtuple
 
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import balanced_accuracy_score
+
 
 class Model(namedtuple('Model', 'pred label')):
     def logits(self):
@@ -160,18 +163,19 @@ class Model(namedtuple('Model', 'pred label')):
         ])
 
     def results(protected_model, non_protected_model):
+        # accuracy = (
+        #            protected_model.tn_count() + protected_model.tp_count() + non_protected_model.tn_count() + non_protected_model.tp_count()) / (
+        #                protected_model.tn_count() + protected_model.tp_count() + non_protected_model.tn_count() + non_protected_model.tp_count() +
+        #                protected_model.fn_count() + protected_model.fp_count() + non_protected_model.fn_count() + non_protected_model.fp_count())
+        accuracy = accuracy_score(np.concatenate((protected_model.label, non_protected_model.label), axis=None),np.concatenate((protected_model.pred.round(), non_protected_model.pred.round()), axis=None))
+        balanced_acc = balanced_accuracy_score(np.concatenate((protected_model.label, non_protected_model.label), axis=None),np.concatenate((protected_model.pred.round(), non_protected_model.pred.round()), axis=None))
 
-        accuracy = (protected_model.tn_count() + protected_model.tp_count() + non_protected_model.tn_count() + non_protected_model.tp_count()) / (
-                       protected_model.tn_count() + protected_model.tp_count() + non_protected_model.tn_count() + non_protected_model.tp_count() +
-                       protected_model.fn_count() + protected_model.fp_count() + non_protected_model.fn_count() + non_protected_model.fp_count())
+        # balanced_acc = (
+        #                    ((protected_model.tn_count() + non_protected_model.tn_count()) / (protected_model.tn_count() + non_protected_model.tn_count() + protected_model.fn_count() + non_protected_model.fn_count())) +
+        #                    ((protected_model.tp_count() + non_protected_model.tp_count()) / (protected_model.tp_count() + non_protected_model.tp_count() + protected_model.fp_count() + non_protected_model.fp_count()))
+        #                ) * 0.5
 
-        balanced_acc = ((protected_model.tn_count() + non_protected_model.tn_count()) / (
-            protected_model.tn_count() + non_protected_model.tn_count() + protected_model.fn_count() + non_protected_model.fn_count()) + (
-                            protected_model.tp_count() + non_protected_model.tp_count()) / (
-                            protected_model.tp_count() + non_protected_model.tp_count() + protected_model.fp_count() + non_protected_model.fp_count())) * 0.5
-
-        fairness = abs(protected_model.fn_cost() - non_protected_model.fn_cost()) + abs(
-            protected_model.fp_cost() - non_protected_model.fp_cost())
+        fairness = abs(protected_model.tpr() - non_protected_model.tpr()) + abs(protected_model.tnr() - non_protected_model.tnr())
 
         return {"accuracy": accuracy, "balanced_accuracy": balanced_acc, "fairness": fairness,
                 "TNR_protected": protected_model.tnr(), "TPR_protected": protected_model.tpr(),

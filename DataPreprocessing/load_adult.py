@@ -17,12 +17,12 @@ np.random.seed(SEED)
 
 
 
-def load_adult_gender():
+def load_adult(sa):
 
 	FEATURES_CLASSIFICATION = ["workclass", "education", "Maritial-status", "occupation", "race", "sex", "country","age", "Capital-gain","Capital-loss","Hours-per-week"] #features to be used for classification
 	CONT_VARIABLES = ["age", "Capital-gain","Capital-loss","Hours-per-week"] # continuous features, will need to be handled separately from categorical features, categorical features will be encoded using one-hot
 	CLASS_FEATURE = "Class-label" # the decision variable
-	SENSITIVE_ATTRS = ["sex"]
+	SENSITIVE_ATTRS = [sa]
 
 
 	COMPAS_INPUT_FILE = "DataPreprocessing/adult.csv"

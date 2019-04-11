@@ -2,6 +2,9 @@ import cvxpy as cvx
 import numpy as np
 from collections import namedtuple
 
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import balanced_accuracy_score
+
 
 class Model(namedtuple('Model', 'pred label')):
     def logits(self):
@@ -88,6 +91,14 @@ class Model(namedtuple('Model', 'pred label')):
 
     def accuracies(self):
         return self.pred.round() == self.label
+
+
+    def before_insertion_check_values(self, other, mix_rates=None, debug=False):
+        if debug:
+            print('Equalized odds group 0 model:\n%s\n' % repr(self))
+            print('Equalized odds group 1 model:\n%s\n' % repr(other))
+            print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+        return self.eq_odds(other,mix_rates)
 
     def eq_odds(self, othr, mix_rates=None):
         has_mix_rates = not (mix_rates is None)
@@ -205,97 +216,22 @@ class Model(namedtuple('Model', 'pred label')):
         ])
 
     def results(protected_model, non_protected_model):
+        #
+        # accuracy = (protected_model.tn_count() + protected_model.tp_count() + non_protected_model.tn_count() + non_protected_model.tp_count()) / (
+        #                protected_model.tn_count() + protected_model.tp_count() + non_protected_model.tn_count() + non_protected_model.tp_count() +
+        #                protected_model.fn_count() + protected_model.fp_count() + non_protected_model.fn_count() + non_protected_model.fp_count())
 
-        accuracy = (
-                   protected_model.tn_count() + protected_model.tp_count() + non_protected_model.tn_count() + non_protected_model.tp_count()) / (
-                       protected_model.tn_count() + protected_model.tp_count() + non_protected_model.tn_count() + non_protected_model.tp_count() +
-                       protected_model.fn_count() + protected_model.fp_count() + non_protected_model.fn_count() + non_protected_model.fp_count())
+        accuracy = accuracy_score(np.concatenate((protected_model.label, non_protected_model.label), axis=None),np.concatenate((protected_model.pred.round(), non_protected_model.pred.round()), axis=None))
+        balanced_acc = balanced_accuracy_score(np.concatenate((protected_model.label, non_protected_model.label), axis=None),np.concatenate((protected_model.pred.round(), non_protected_model.pred.round()), axis=None))
 
-        balanced_acc = ((protected_model.tn_count() + non_protected_model.tn_count()) / (
-            protected_model.tn_count() + non_protected_model.tn_count() + protected_model.fn_count() + non_protected_model.fn_count()) + (
-                            protected_model.tp_count() + non_protected_model.tp_count()) / (
-                            protected_model.tp_count() + non_protected_model.tp_count() + protected_model.fp_count() + non_protected_model.fp_count())) * 0.5
 
-        # TPR = (protected_model.tp_count() + non_protected_model.tp_count())/(protected_model.tp_count() + non_protected_model.tp_count() + protected_model.fn_count() + non_protected_model.fn_count())
-        # TNR = (protected_model.tn_count() + non_protected_model.tn_count())/(protected_model.tn_count() + non_protected_model.tn_count() + protected_model.fp_count() + non_protected_model.fp_count())
+        fairness = abs(protected_model.tpr() - non_protected_model.tpr()) + abs(protected_model.tnr() - non_protected_model.tnr())
 
-        fairness = abs(protected_model.fn_cost() - non_protected_model.fn_cost()) + abs(protected_model.fp_cost() - non_protected_model.fp_cost())
 
         # print('Equalized odds group 0 model:\n%s\n' % repr(protected_model))
         # print('Equalized odds group 1 model:\n%s\n' % repr(non_protected_model))
+
         return {"accuracy": accuracy, "balanced_accuracy": balanced_acc, "fairness": fairness,
                 "TNR_protected": protected_model.tnr(), "TPR_protected": protected_model.tpr(),
                 "TPR_non_protected": non_protected_model.tpr(), "TNR_non_protected": non_protected_model.tnr()}
 
-        # """
-        # Demo
-        # """
-        # if __name__ == '__main__':
-        #     """
-        #     To run the demo:
-        #
-        #     ```
-        #     python eq_odds.py <path_to_model_predictions.csv>
-        #     ```
-        #
-        #     `<path_to_model_predictions.csv>` should contain the following columns for the VALIDATION set:
-        #
-        #     - `prediction` (a score between 0 and 1)
-        #     - `label` (ground truth - either 0 or 1)
-        #     - `group` (group assignment - either 0 or 1)
-        #
-        #     Try the following experiments, which were performed in the paper:
-        #     ```
-        #     python eq_odds.py data/income.csv
-        #     python eq_odds.py data/health.csv
-        #     python eq_odds.py data/criminal_recidivism.csv
-        #     ```
-        #     """
-        #     import pandas as pd
-        #     import sys
-        #
-        #     # if not len(sys.argv) == 2:
-        #     #     raise RuntimeError('Invalid number of arguments')
-        #
-        #     # Load the validation set scores from csvs
-        #     data_filename = 'data/criminal_recidivism.csv'
-        #     test_and_val_data = pd.read_csv('data/criminal_recidivism.csv')
-        #
-        #     # Randomly split the data into two sets - one for computing the fairness constants
-        #     order = np.random.permutation(len(test_and_val_data))
-        #     val_indices = order[0::2]
-        #     test_indices = order[1::2]
-        #
-        #     val_data = test_and_val_data.iloc[val_indices]
-        #     test_data = test_and_val_data.iloc[test_indices]
-        #
-        #     # Create model objects - one for each group, validation and test
-        #     group_0_val_data = val_data[val_data['group'] == 0]
-        #     group_1_val_data = val_data[val_data['group'] == 1]
-        #
-        #     group_0_test_data = test_data[test_data['group'] == 0]
-        #     group_1_test_data = test_data[test_data['group'] == 1]
-        #
-        #     group_0_val_model = Model(group_0_val_data['prediction'].as_matrix(), group_0_val_data['label'].as_matrix())
-        #     group_1_val_model = Model(group_1_val_data['prediction'].as_matrix(), group_1_val_data['label'].as_matrix())
-        #     group_0_test_model = Model(group_0_test_data['prediction'].as_matrix(), group_0_test_data['label'].as_matrix())
-        #     group_1_test_model = Model(group_1_test_data['prediction'].as_matrix(), group_1_test_data['label'].as_matrix())
-        #
-        #     # Find mixing rates for equalized odds models
-        #     _, _, mix_rates = Model.eq_odds(group_0_val_model, group_1_val_model)
-        #
-        #     # Apply the mixing rates to the test models
-        #     # eq_odds_group_0_test_model, eq_odds_group_1_test_model = Model.eq_odds(group_0_val_model,
-        #     #                                                                        group_1_val_model,
-        #     #                                                                        mix_rates)
-        #     eq_odds_group_0_test_model, eq_odds_group_1_test_model = Model.eq_odds(group_0_test_model,
-        #                                                                            group_1_test_model,
-        #                                                                            mix_rates)
-        #
-        #     print Model.balanced_acc(eq_odds_group_0_test_model, eq_odds_group_1_test_model)
-
-        # Print results on test model
-        # print('Original group 0 model:\n%s\n' % repr(group_0_test_model))
-        # print('Original group 1 model:\n%s\n' % repr(group_1_test_model))
-        # print('Equalized odds group 0 model:\n%s\n' % repr(eq_odds_group_0_test_model))
-        # print('Equalized odds group 1 model:\n%s\n' % repr(eq_odds_group_1_test_model))

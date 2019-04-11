@@ -196,8 +196,7 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             old_weights_sum = np.sum(sample_weight)
 
         best_theta = self.tuning_learners.index(min(self.tuning_learners))
-        # best_theta += 1
-        # print "best #weak learners = "+ str(best_theta )
+        print "best #weak learners = "+ str(best_theta)
 
         self.estimators_ = self.estimators_[:best_theta ]
         self.estimator_alphas_ = self.estimator_alphas_[:best_theta ]

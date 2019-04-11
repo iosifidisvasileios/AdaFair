@@ -1,3 +1,4 @@
+import random
 from collections import defaultdict
 from multiprocessing import Process, Lock
 import pickle
@@ -5,6 +6,8 @@ import os
 import matplotlib
 import numpy
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import ShuffleSplit
+from sklearn.naive_bayes import GaussianNB
 
 matplotlib.use('Agg')
 import sys
@@ -31,10 +34,9 @@ from AdaCost import AdaCostClassifier
 from FairAdaCost import FairAdaCost
 from load_kdd import load_kdd
 from load_dutch_data import load_dutch_data
-from load_german import load_german
-from load_compas_data import load_compas_data
-from load_adult_gender import load_adult_gender
-from load_adult_race import load_adult_race
+# from load_german import load_german
+from load_compas_data import load_compas
+from load_adult import load_adult
 from load_bank import load_bank
 from my_useful_functions import calculate_performance, plot_my_results
 import utils as ut
@@ -66,32 +68,43 @@ def predict(clf, X_test, y_test, sa_index, p_Group):
     return calculate_performance(X_test, y_test, y_pred_labels, y_pred_probs, sa_index, p_Group)
 
 
-def run_eval(dataset):
-    suffixes = ['adaboost', 'Sin.1', 'Sin.2', 'Cumul.1', 'Cumul.2', 'zafar', 'Hardt', 'Pleiss']
+def run_eval(dataset, iterations):
+    # suffixes = ['adaboost', 'Sin.1', 'Sin.2', 'Cumul.1', 'Cumul.2', 'zafar', 'Hardt', 'Pleiss']
+    suffixes = ['adaboost', 'Cumul.1', 'Cumul.2', 'zafar', 'Hardt', 'Pleiss']
     create_temp_files(dataset, suffixes)
 
-    if dataset == "compass":
-        X, y, sa_index, p_Group, x_control = load_compas_data()
+    if dataset == "compass-gender":
+        tau = 5.0
+        mu = 1.2
+        X, y, sa_index, p_Group, x_control = load_compas("sex")
+    elif dataset == "compass-race":
+        tau = 5.0
+        mu = 1.2
+        X, y, sa_index, p_Group, x_control = load_compas("race")
     elif dataset == "adult-gender":
-        X, y, sa_index, p_Group, x_control = load_adult_gender()
+        tau = 3.5
+        mu = 1.2
+        X, y, sa_index, p_Group, x_control = load_adult("sex")
     elif dataset == "adult-race":
-        X, y, sa_index, p_Group, x_control = load_adult_race()
+        tau = 3.0
+        mu = 1.2
+        X, y, sa_index, p_Group, x_control = load_adult("race")
     elif dataset == "dutch":
+        tau = 3.0
+        mu = 1.5
         X, y, sa_index, p_Group, x_control = load_dutch_data()
     elif dataset == "bank":
+        tau = 4.0
+        mu = 1.5
         X, y, sa_index, p_Group, x_control = load_bank()
-    # elif dataset == "german":
-    #     X, y, sa_index, p_Group, x_control = load_german()
     else:
         exit(1)
 
     # init parameters for zafar method (default settings)
-    tau = 5.0
-    mu = 1.2
     cons_type = 4
     sensitive_attrs = x_control.keys()
     loss_function = "logreg"
-    EPS = 1e-6
+    EPS = 1e-4
     sensitive_attrs_to_cov_thresh = {sensitive_attrs[0]: {0: {0: 0, 1: 0}, 1: {0: 0, 1: 0}, 2: {0: 0, 1: 0}}}
     cons_params = {"cons_type": cons_type, "tau": tau, "mu": mu,
                    "sensitive_attrs_to_cov_thresh": sensitive_attrs_to_cov_thresh}
@@ -101,40 +114,54 @@ def run_eval(dataset):
     for lock in range(0, 8):
         mutex.append(Lock())
 
-    for iter in range(0, 5):
+    random.seed(12345)
+
+    for iter in range(0, iterations):
         start = time.time()
-        kf = StratifiedKFold(n_splits=2, random_state=int(time.time()), shuffle=True)
 
-        for train_index, test_index in kf.split(X, y):
+        # for zafar's approach need to specify test and train indeces from the beginning
+        temp_shuffle_array = [i for i in range(0, len(X))]
+        random.shuffle(temp_shuffle_array)
+        train1 = temp_shuffle_array[: int(len(X)/2)]
+        test1  = temp_shuffle_array[int(len(X)/2): int(len(X)/2) + int(len(X)/4)]
+        valid1 = temp_shuffle_array[int(len(X)/2) + int(len(X)/4):]
 
-            X_train, X_test = X[train_index], X[test_index]
-            y_train, y_test = y[train_index], y[test_index]
+        train2 = temp_shuffle_array[int(len(X)/2):]
+        test2  = temp_shuffle_array[:int(len(X)/2) - int(len(X)/4)]
+        valid2 = temp_shuffle_array[int(len(X)/2) - int(len(X)/4):int(len(X)/2)]
 
-            for proc in range(0, 8):
-                if proc < 5:
-                    threads.append(Process(target=train_classifier, args=( X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc],proc, 100)))
-                elif proc == 5:
+        for train_index, test_index, valid_index in [[train1, test1, valid1],[train2, test2, valid2]]:
+
+            X_train, X_test, X_valid = X[train_index], X[test_index], X[valid_index]
+            y_train, y_test, y_valid = y[train_index], y[test_index], y[valid_index]
+
+            for proc in range(0, 6):
+
+                if proc < 3:
+                    threads.append(Process(target=train_classifier, args=( X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc],proc, 200)))
+
+
+                elif proc == 3:
                     temp_x_control_train = defaultdict(list)
                     temp_x_control_test = defaultdict(list)
 
                     temp_x_control_train[sensitive_attrs[0]] = x_control[sensitive_attrs[0]][train_index]
                     temp_x_control_test[sensitive_attrs[0]] = x_control[sensitive_attrs[0]][test_index]
 
-                    x_train, y_train, x_control_train = ut.conversion(X[train_index], y[train_index],
-                                                                      dict(temp_x_control_train), 1)
-                    x_test, y_test, x_control_test = ut.conversion(X[test_index], y[test_index],
-                                                                   dict(temp_x_control_test), 1)
+                    x_zafar_train, y_zafar_train, x_control_train = ut.conversion(X[train_index], y[train_index],dict(temp_x_control_train), 1)
 
-                    threads.append(Process(target=train_zafar, args=(x_train, y_train, x_control_train,
-                                                                     x_test, y_test, x_control_test,
+                    x_zafar_test, y_zafar_test, x_control_test = ut.conversion(X[test_index], y[test_index],dict(temp_x_control_test), 1)
+
+                    threads.append(Process(target=train_zafar, args=(x_zafar_train, y_zafar_train, x_control_train,
+                                                                     x_zafar_test, y_zafar_test, x_control_test,
                                                                      cons_params, loss_function, EPS,
                                                                      dataset + suffixes[proc], mutex[proc],
                                                                      sensitive_attrs)))
-                elif proc == 6:
-                    threads.append(Process(target=train_hardt, args=(X_train, X_test, y_train, y_test, sa_index,
+                elif proc == 4:
+                    threads.append(Process(target=train_hardt, args=(X_train, X_test, y_train, y_test, X_valid, y_valid ,sa_index,
                                                                      dataset + suffixes[proc], mutex[proc])))
-                elif proc == 7:
-                    threads.append(Process(target=train_pleiss, args=(X_train, X_test, y_train, y_test, sa_index,
+                elif proc == 5:
+                    threads.append(Process(target=train_pleiss, args=(X_train, X_test, y_train, y_test, X_valid, y_valid, sa_index,
                                                                       dataset + suffixes[proc], mutex[proc])))
 
     for process in threads:
@@ -144,60 +171,60 @@ def run_eval(dataset):
         process.join()
 
     threads = []
-    print "elapsed time for k-fold iteration = " + str(time.time() - start)
+    # print "elapsed time for k-fold iteration = " + str(time.time() - start)
+    print "elapsed time = " + str(time.time() - start)
 
     results = []
     for suffix in suffixes:
         infile = open(dataset + suffix, 'rb')
         temp_buffer = pickle.load(infile)
         results.append(temp_buffer.performance)
-
         infile.close()
 
     plot_my_results(results, suffixes, "Images/" + dataset, dataset)
     delete_temp_files(dataset, suffixes)
 
 
-def train_pleiss(X_train, X_test, y_train, y_test, sa_index, dataset, mutex):
+def train_pleiss(X_train, X_test, y_train, y_test, X_valid, y_valid, sa_index, dataset, mutex):
     clf = LogisticRegression().fit(X_train, y_train)
 
-    y_pred_probs = clf.predict_proba(X_test)[:, 1]
-
-    temp_y = y_test
-    temp_y[temp_y == -1] = 0
-
-    my_df = pd.DataFrame(columns=['label', 'group', 'prediction'])
-
+    # predictions for test set
+    test_set = pd.DataFrame(columns=['label', 'group', 'prediction'])
+    y_test_set_pred_probs = clf.predict_proba(X_test)[:, 1]
+    temp_test_y = y_test
+    temp_test_y[temp_test_y == -1] = 0
     for line in range(0, len(X_test)):
-        my_df.loc[line] = [temp_y[line], X_test[line][sa_index], y_pred_probs[line]]
+        test_set.loc[line] = [temp_test_y[line], X_test[line][sa_index], y_test_set_pred_probs[line]]
 
-    order = numpy.random.permutation(len(my_df))
-    val_indices = order[0::2]
-    test_indices = order[1::2]
+    # predictions for validation set
+    valid_set = pd.DataFrame(columns=['label', 'group', 'prediction'])
+    y_valid_set_pred_probs = clf.predict_proba(X_valid)[:, 1]
+    temp_valid_y = y_valid
+    temp_valid_y[temp_valid_y == -1] = 0
+    for line in range(0, len(X_valid)):
+        valid_set.loc[line] = [temp_valid_y[line], X_valid[line][sa_index], y_valid_set_pred_probs[line]]
 
-    val_data = my_df.iloc[val_indices]
-    test_data = my_df.iloc[test_indices]
-    group_0_val_data = val_data[val_data['group'] == 0]
-    group_1_val_data = val_data[val_data['group'] == 1]
-
-    protected_test_data = test_data[test_data['group'] == 0]
-    non_protected_test_data = test_data[test_data['group'] == 1]
-
+    # initialize validation set
+    group_0_val_data = valid_set[valid_set['group'] == 0]
+    group_1_val_data = valid_set[valid_set['group'] == 1]
     protected_val_model = calibModel(group_0_val_data['prediction'].values, group_0_val_data['label'].values)
     non_protected_val_model = calibModel(group_1_val_data['prediction'].values, group_1_val_data['label'].values)
 
-    protected_test_model = calibModel(protected_test_data['prediction'].values, protected_test_data['label'].values)
-    non_protected_test_model = calibModel(non_protected_test_data['prediction'].values,
-                                          non_protected_test_data['label'].values)
-
-
+    # tune algorithm
     _, _, mix_rates = calibModel.calib_eq_odds(protected_val_model, non_protected_val_model, 1, 1)
-    eq_odds_protected_test_model, eq_odds_non_protected_test_model = calibModel.calib_eq_odds(protected_test_model,
-                                                                                              non_protected_test_model,
-                                                                                              1, 1,
-                                                                                              mix_rates)
 
+    # initialize test set
+    protected_test_data = test_set[test_set['group'] == 0]
+    non_protected_test_data = test_set[test_set['group'] == 1]
+    protected_test_model = calibModel(protected_test_data['prediction'].values, protected_test_data['label'].values)
+    non_protected_test_model = calibModel(non_protected_test_data['prediction'].values,non_protected_test_data['label'].values)
+
+    # apply model
+    eq_odds_protected_test_model, eq_odds_non_protected_test_model = calibModel.calib_eq_odds(protected_test_model,non_protected_test_model,1, 1,mix_rates)
+
+    # obtain results
     results = calibModel.results(eq_odds_protected_test_model, eq_odds_non_protected_test_model)
+
     mutex.acquire()
     infile = open(dataset, 'rb')
     dict_to_ram = pickle.load(infile)
@@ -208,40 +235,45 @@ def train_pleiss(X_train, X_test, y_train, y_test, sa_index, dataset, mutex):
     outfile.close()
     mutex.release()
 
-def train_hardt(X_train, X_test, y_train, y_test, sa_index, dataset, mutex):
+def train_hardt(X_train, X_test, y_train, y_test, X_valid, y_valid, sa_index, dataset, mutex):
     clf = LogisticRegression().fit(X_train, y_train)
 
-    y_pred_probs = clf.predict_proba(X_test)[:, 1]
-
+    # predictions for test set
+    test_set = pd.DataFrame(columns=['label', 'group', 'prediction'])
+    y_test_set_pred_probs = clf.predict_proba(X_test)[:, 1]
     temp_y = y_test
     temp_y[temp_y == -1] = 0
-
-    my_df = pd.DataFrame(columns=['label', 'group', 'prediction'])
-
     for line in range(0, len(X_test)):
-        my_df.loc[line] = [temp_y[line], X_test[line][sa_index], y_pred_probs[line]]
+        test_set.loc[line] = [temp_y[line], X_test[line][sa_index], y_test_set_pred_probs[line]]
 
-    order = numpy.random.permutation(len(my_df))
-    val_indices = order[0::2]
-    test_indices = order[1::2]
+    # predictions for validation set
+    valid_set = pd.DataFrame(columns=['label', 'group', 'prediction'])
+    y_valid_set_pred_probs = clf.predict_proba(X_valid)[:, 1]
+    temp_y = y_valid
+    temp_y[temp_y == -1] = 0
+    for line in range(0, len(X_valid)):
+        valid_set.loc[line] = [temp_y[line], X_valid[line][sa_index], y_valid_set_pred_probs[line]]
 
-    val_data = my_df.iloc[val_indices]
-    test_data = my_df.iloc[test_indices]
-    group_0_val_data = val_data[val_data['group'] == 0]
-    group_1_val_data = val_data[val_data['group'] == 1]
-
-    protected_test_data = test_data[test_data['group'] == 0]
-    non_protected_test_data = test_data[test_data['group'] == 1]
-
+    # initialize validation set
+    group_0_val_data = valid_set[valid_set['group'] == 0]
+    group_1_val_data = valid_set[valid_set['group'] == 1]
     protected_val_model = Model(group_0_val_data['prediction'].values, group_0_val_data['label'].values)
     non_protected_val_model = Model(group_1_val_data['prediction'].values, group_1_val_data['label'].values)
+
+    # tune algorithm
     _, _, mix_rates = Model.eq_odds(protected_val_model, non_protected_val_model)
 
-
+    # initialize test set
+    protected_test_data = test_set[test_set['group'] == 0]
+    non_protected_test_data = test_set[test_set['group'] == 1]
     protected_test_model = Model(protected_test_data['prediction'].values, protected_test_data['label'].values)
     non_protected_test_model = Model(non_protected_test_data['prediction'].values, non_protected_test_data['label'].values)
+
+    # apply model
+    # eq_odds_protected_test_model, eq_odds_non_protected_test_model = Model.before_insertion_check_values(protected_test_model, non_protected_test_model, mix_rates)
     eq_odds_protected_test_model, eq_odds_non_protected_test_model = Model.eq_odds(protected_test_model, non_protected_test_model, mix_rates)
 
+    # obtain results
     results = Model.results(eq_odds_protected_test_model, eq_odds_non_protected_test_model)
     mutex.acquire()
     infile = open(dataset, 'rb')
@@ -254,24 +286,21 @@ def train_hardt(X_train, X_test, y_train, y_test, sa_index, dataset, mutex):
     mutex.release()
 
 
-def train_zafar(x_train, y_train, x_control_train, x_test, y_test, x_control_test,
-                cons_params, loss_function, EPS, dataset, mutex, sensitive_attrs):
-    def train_test_classifier():
-        w = fdm.train_model_disp_mist(x_train, y_train, x_control_train, loss_function, EPS, cons_params)
-        rates, accuracy, balanced_acc = fdm.get_clf_stats(w, x_train, y_train, x_control_train, x_test, y_test,
-                                                          x_control_test, sensitive_attrs)
-        return rates, accuracy, balanced_acc
-
-    correct = False
+def train_zafar(x_train, y_train, x_control_train, x_test, y_test, x_control_test, cons_params, loss_function, EPS, dataset, mutex, sensitive_attrs):
 
     cnt = 1
-    while correct != True:
+    while True:
+        if cnt > 41:
+            return
+
         try:
-            rates, acc, balanced_acc = train_test_classifier()
-            correct = True
+            w = fdm.train_model_disp_mist(x_train, y_train, x_control_train, loss_function, EPS, cons_params)
+            rates, acc, balanced_acc = fdm.get_clf_stats(w, x_train, y_train, x_control_train, x_test, y_test, x_control_test, sensitive_attrs)
+            print "Solved !!!"
+            break
         except Exception, e:
-            if cnt % 5 == 0:
-                cons_params['tau'] /= 1.03
+            if cnt % 4 == 0:
+                cons_params['tau'] *= 1.10
             print str(e) + ", tau = " + str(cons_params['tau'])
             cnt += 1
             pass
@@ -301,14 +330,14 @@ def train_zafar(x_train, y_train, x_control_train, x_test, y_test, x_control_tes
 def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, mode, base_learners):
     if mode == 0:
         classifier = AdaCostClassifier(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB2")
+    # elif mode == 1:
+    #     classifier = FairAdaCost(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB1")
+    # elif mode == 2:
+    #     classifier = FairAdaCost(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB2")
     elif mode == 1:
-        classifier = FairAdaCost(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB1")
+        classifier = AccumFairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB1")
     elif mode == 2:
-        classifier = FairAdaCost(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB2")
-    elif mode == 3:
-        classifier = AccumFairAdaCost(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB1")
-    elif mode == 4:
-        classifier = AccumFairAdaCost(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB2")
+        classifier = AccumFairAdaCost( n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2")
 
     classifier.fit(X_train, y_train)
 
@@ -327,10 +356,10 @@ def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, datase
     mutex.release()
 
 
-def main(dataset):
-    run_eval(dataset)
+def main(dataset, iterations=5):
+    run_eval(dataset,iterations)
 
 
 if __name__ == '__main__':
-    # main(sys.argv[1])
-    main("german")
+    main(sys.argv[1], int(sys.argv[2]))
+    # main("compass-gender",5)

@@ -263,11 +263,11 @@ def plot_my_results(results, names, output_dir, dataset):
     plt.grid(True)
     index = numpy.arange(7)
     bar_width = 0.10
-    # plt.xticks(index + bar_width / 2,
-    #            ('accuracy', 'balanced_accuracy', 'fairness', 'TPR_P', 'TPR_N_P', 'TNR_P', 'TNR_N_P'))
+
     plt.xticks(index + bar_width / 2,
                ('accuracy', 'balanced_accuracy', 'fairness', 'TPR_P', 'TPR_N_P', 'TNR_P', 'TNR_N_P'))
 
+    colors = ['b','g','r','c','m','y','k', 'dimgray']
     for i in range(0, len(names)):
         plt.bar(index + bar_width * i,
                 [accuracy_list[i], balanced_accuracy_list[i], fairness_list[i], tpr_protected_list[i],
@@ -275,9 +275,9 @@ def plot_my_results(results, names, output_dir, dataset):
                 yerr=[std_accuracy_list[i], std_balanced_accuracy_list[i], std_fairness_list[i],
                       std_tpr_protected_list[i], std_tpr_non_protected_list[i], std_tnr_protected_list[i],
                       std_tnr_non_protected_list[i]],
-                label=names[i])
+                label=names[i], color=colors[i],edgecolor='black')
 
-    plt.legend()
+    plt.legend(loc='best')
     plt.ylabel('(%)')
     plt.title("Performance for " + dataset)
     plt.savefig(output_dir + "_performance.png")
