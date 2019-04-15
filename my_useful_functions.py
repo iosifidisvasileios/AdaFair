@@ -65,7 +65,10 @@ def calculate_performance(data, labels, predictions, probs, saIndex, saValue):
 
     output = dict()
 
-    output["balanced_accuracy"] = balanced_accuracy_score(labels, predictions)
+    # output["balanced_accuracy"] = balanced_accuracy_score(labels, predictions)
+    output["balanced_accuracy"] =( (tp_protected + tp_non_protected)/(tp_protected + tp_non_protected + fn_protected + fn_non_protected) +
+                                   (tn_protected + tn_non_protected) / (tn_protected + tn_non_protected + fp_protected + fp_non_protected))*0.5
+
     output["accuracy"] = accuracy_score(labels, predictions)
     # output["dTPR"] = tpr_non_protected - tpr_protected
     # output["dTNR"] = tnr_non_protected - tnr_protected
@@ -76,6 +79,97 @@ def calculate_performance(data, labels, predictions, probs, saIndex, saValue):
     output["TNR_protected"] = tnr_protected
     output["TNR_non_protected"] = tnr_non_protected
     return output
+
+
+def plot_results_of_c_impact(csb1, csb2, steps, output_dir, dataset):
+    csb1_accuracy_list = []
+    csb1_balanced_accuracy_list = []
+    csb1_fairness_list = []
+    csb1_tpr_protected_list = []
+    csb1_tpr_non_protected_list = []
+    csb1_tnr_protected_list = []
+    csb1_tnr_non_protected_list = []
+
+    csb2_accuracy_list = []
+    csb2_balanced_accuracy_list = []
+    csb2_fairness_list = []
+    csb2_tpr_protected_list = []
+    csb2_tpr_non_protected_list = []
+    csb2_tnr_protected_list = []
+    csb2_tnr_non_protected_list = []
+
+    for c in steps:
+
+        accuracy = []
+        balanced_accuracy = []
+        fairness = []
+        tpr_protected = []
+        tpr_non_protected = []
+        tnr_protected = []
+        tnr_non_protected = []
+
+        for item in csb1[c]:
+            accuracy.append(item["accuracy"])
+            balanced_accuracy.append(item["balanced_accuracy"])
+            fairness.append(item["fairness"])
+            tpr_protected.append(item["TPR_protected"])
+            tpr_non_protected.append(item["TPR_non_protected"])
+            tnr_protected.append(item["TNR_protected"])
+            tnr_non_protected.append(item["TNR_non_protected"])
+
+        csb1_accuracy_list.append(numpy.mean(accuracy))
+        csb1_balanced_accuracy_list.append(numpy.mean(balanced_accuracy))
+        csb1_fairness_list.append(numpy.mean(fairness))
+        # csb1_tpr_protected_list.append(numpy.mean(tpr_protected))
+        # csb1_tpr_non_protected_list.append(numpy.mean(tpr_non_protected))
+        # csb1_tnr_protected_list.append(numpy.mean(tnr_protected))
+        # csb1_tnr_non_protected_list.append(numpy.mean(tnr_non_protected))
+
+        accuracy = []
+        balanced_accuracy = []
+        fairness = []
+        tpr_protected = []
+        tpr_non_protected = []
+        tnr_protected = []
+        tnr_non_protected = []
+
+        for item in csb2[c]:
+            accuracy.append(item["accuracy"])
+            balanced_accuracy.append(item["balanced_accuracy"])
+            fairness.append(item["fairness"])
+            tpr_protected.append(item["TPR_protected"])
+            tpr_non_protected.append(item["TPR_non_protected"])
+            tnr_protected.append(item["TNR_protected"])
+            tnr_non_protected.append(item["TNR_non_protected"])
+
+        csb2_accuracy_list.append(numpy.mean(accuracy))
+        csb2_balanced_accuracy_list.append(numpy.mean(balanced_accuracy))
+        csb2_fairness_list.append(numpy.mean(fairness))
+        # csb2_tpr_protected_list.append(numpy.mean(tpr_protected))
+        # csb2_tpr_non_protected_list.append(numpy.mean(tpr_non_protected))
+        # csb2_tnr_protected_list.append(numpy.mean(tnr_protected))
+        # csb2_tnr_non_protected_list.append(numpy.mean(tnr_non_protected))
+
+    plt.figure(figsize=(7, 7))
+    plt.grid(True)
+    plt.rcParams.update({'font.size': 14})
+
+    plt.plot(steps, csb1_accuracy_list, '-b', label='AFB CSB1 Accuracy')
+    plt.plot(steps, csb2_accuracy_list, '-r', label='AFB CSB2 Accuracy')
+
+    plt.plot(steps, csb1_balanced_accuracy_list, '--', label='AFB CSB1 B.Accuracy')
+    plt.plot(steps, csb2_balanced_accuracy_list, ':', label='AFB CSB2 B.Accuracy')
+
+    plt.plot(steps, csb1_fairness_list, '-o', label='AFB CSB1 E.O.')
+    plt.plot(steps, csb2_fairness_list, '-v', label='AFB CSB2 E.O.')
+
+    plt.legend(loc='best')
+
+    plt.xlabel('c')
+    plt.ylabel('(%)')
+    # plt.title("Impact of c for " + dataset + " dataset")
+
+    plt.savefig(output_dir + dataset + "_c_impact.png")
 
 
 def plot_results(init, max_cost, step, summary_performance, summary_weights, output_dir, title, plot_weights=True):
@@ -259,13 +353,22 @@ def plot_my_results(results, names, output_dir, dataset):
         std_tnr_protected_list.append(numpy.std(tnr_protected))
         std_tnr_non_protected_list.append(numpy.std(tnr_non_protected))
 
-    plt.figure(figsize=(18, 14))
-    plt.grid(True)
-    index = numpy.arange(7)
-    bar_width = 0.10
+    plt.figure(figsize=(11, 9))
+    plt.rcParams.update({'font.size': 14})
+    plt.ylim([0,1])
+    plt.yticks(numpy.arange(0, 1, step=0.05))
 
-    plt.xticks(index + bar_width / 2,
-               ('accuracy', 'balanced_accuracy', 'fairness', 'TPR_P', 'TPR_N_P', 'TNR_P', 'TNR_N_P'))
+    plt.setp(plt.gca().get_xticklabels(), rotation=20, horizontalalignment='right')
+
+    plt.grid(True, axis='y')
+    index = numpy.arange(0, 8, step=1.3)
+    # index = numpy.arange(7)
+    bar_width = 0.175
+
+
+
+    plt.xticks(index + 1.5*bar_width ,
+               ('Accuracy', 'Balanced Accuracy', 'Equal.Odds', 'TPR Prot.', 'TPR Non-Prot.', 'TNR Prot.', 'TNR Non-Prot.'))
 
     colors = ['b','g','r','c','m','y','k', 'dimgray']
     for i in range(0, len(names)):
@@ -277,10 +380,31 @@ def plot_my_results(results, names, output_dir, dataset):
                       std_tnr_non_protected_list[i]],
                 label=names[i], color=colors[i],edgecolor='black')
 
-    plt.legend(loc='best')
+    plt.legend(loc='best',ncol=2, shadow=False)
     plt.ylabel('(%)')
     plt.title("Performance for " + dataset)
-    plt.savefig(output_dir + "_performance.png")
+    plt.savefig(output_dir + "_performance.png",bbox_inches='tight', dpi=400)
+    print names
+    print "accuracy " + str(accuracy_list)
+    print "accuracy dev " + str(std_accuracy_list)
+    print "balanced_accuracy " + str(balanced_accuracy_list)
+    print "balanced_accuracy dev " + str(std_balanced_accuracy_list)
+
+    print "fairness " + str(fairness_list)
+    print "fairness_dev " + str(std_fairness_list)
+
+    print "tpr_protected_list " + str(tpr_protected_list)
+    print "std_tpr_protected_list " + str(std_tpr_protected_list)
+
+    print "tpr_non_protected_list " + str(tpr_non_protected_list)
+    print "std_tpr_non_protected_list " + str(std_tpr_non_protected_list)
+
+    print "tnr_protected_list " + str(tnr_protected_list)
+    print "std_tnr_protected_list " + str(std_tnr_protected_list)
+
+    print "tnr_non_protected_list " + str(tnr_non_protected_list)
+    print "std_tnr_non_protected_list " + str(std_tnr_non_protected_list)
+
 
 
 def plot_calibration_curves(results, names, init_cost, max_cost, step, directory):

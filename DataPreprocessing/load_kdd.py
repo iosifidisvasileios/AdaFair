@@ -18,25 +18,25 @@ np.random.seed(SEED)
 
 
 def load_kdd():
-	# FEATURES_CLASSIFICATION = ["age","class-of-worker", "detailed-industry-recode", "detailed-occupation-recode",
-	# "education", "wage-per-hour", "enroll-in-edu-inst-last-wk", "marital-stat", "major-industry-code",
-	# "major-occupation-code", "race", "hispanic-origin", "sex", "member-of-a-labor-union", "reason-for-unemployment",
-	# "full-or-part-time-employment-stat", "capital-gains", "capital-losses", "dividends-from-stocks", "tax-filer-stat",
-	# "region-of-previous-residence", "state-of-previous-residence", "detailed-household-and-family-stat",
-	# "detailed-household-summary-in-household", "migration-code-change-in-msa", "migration-code-change-in-reg",
-	# "migration-code-move-within-reg", "live-in-this-house-1-year-ago", "migration-prev-res-in-sunbelt",
-	# "num-persons-worked-for-employer", "family-members-under-18", "country-of-birth-father", "country-of-birth-mother",
-	# "country-of-birth-self", "citizenship", "own-business-or-self-employed", "fill-inc-questionnaire-for-veterans-admin", "veterans-benefits",
-	# "weeks-worked-in-year", "year"]
+	FEATURES_CLASSIFICATION = ["age","class-of-worker", "detailed-industry-recode", "detailed-occupation-recode",
+	"education", "wage-per-hour", "enroll-in-edu-inst-last-wk", "marital-stat", "major-industry-code",
+	"major-occupation-code", "race", "hispanic-origin", "sex", "member-of-a-labor-union", "reason-for-unemployment",
+	"full-or-part-time-employment-stat", "capital-gains", "capital-losses", "dividends-from-stocks", "tax-filer-stat",
+	"region-of-previous-residence", "state-of-previous-residence", "detailed-household-and-family-stat",
+	"detailed-household-summary-in-household", "migration-code-change-in-msa", "migration-code-change-in-reg",
+	"migration-code-move-within-reg", "live-in-this-house-1-year-ago", "migration-prev-res-in-sunbelt",
+	"num-persons-worked-for-employer", "family-members-under-18", "country-of-birth-father", "country-of-birth-mother",
+	"country-of-birth-self", "citizenship", "own-business-or-self-employed", "fill-inc-questionnaire-for-veterans-admin", "veterans-benefits",
+	"weeks-worked-in-year", "year"]
 
 
 
 
 
-	FEATURES_CLASSIFICATION = ["class-of-worker", "education", "marital-stat", "race", "sex", "country-of-birth-self","age","capital-gains", "capital-losses", "weeks-worked-in-year"] #features to be used for classification
+	# FEATURES_CLASSIFICATION = ["class-of-worker", "education", "marital-stat", "race", "sex", "country-of-birth-self","age","capital-gains", "capital-losses", "weeks-worked-in-year"] #features to be used for classification
 
-	CONT_VARIABLES = ["capital-gains", "capital-losses"] # continuous features, will need to be handled separately from categorical features, categorical features will be encoded using one-hot
-	# CONT_VARIABLES = ["age", "detailed-industry-recode","detailed-occupation-recode","wage-per-hour","capital-gains", "capital-losses", "num-persons-worked-for-employer", "dividends-from-stocks", "veterans-benefits","weeks-worked-in-year", "year",] # continuous features, will need to be handled separately from categorical features, categorical features will be encoded using one-hot
+	# CONT_VARIABLES = ["capital-gains", "capital-losses", 'age'] # continuous features, will need to be handled separately from categorical features, categorical features will be encoded using one-hot
+	CONT_VARIABLES = ["age", "detailed-industry-recode","detailed-occupation-recode","wage-per-hour","capital-gains", "capital-losses", "num-persons-worked-for-employer", "dividends-from-stocks", "veterans-benefits","weeks-worked-in-year", "year",] # continuous features, will need to be handled separately from categorical features, categorical features will be encoded using one-hot
 
 
 	CLASS_FEATURE = "class" # the decision variable
@@ -129,7 +129,7 @@ def load_kdd():
 	# print "Features we will be using for classification are:", feature_names, "\n"
 	# print x_control
 
-	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0
+	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0, x_control
 
 # Data_type = 1
 # X, y, x_control = load_adult_data()

@@ -21,13 +21,15 @@ np.random.seed(SEED)
 
 def load_dutch_data():
 
-	FEATURES_CLASSIFICATION = ["sex","age","household_position","household_size","prev_residence_place","citizenship","country_birth","edu_level", "economic_status","cur_eco_activity","Marital_status"]
+	FEATURES_CLASSIFICATION = ["sex","age","household_position","household_size","prev_residence_place","citizenship","country_birth","edu_level", "economic_status","cur_eco_activity","Marital_status", "sensitive"]
 	CONT_VARIABLES = ["age","household_position","household_size","prev_residence_place","citizenship","country_birth","edu_level", "economic_status","cur_eco_activity","Marital_status"]
 
 	CLASS_FEATURE = "occupation" # the decision variable
-	SENSITIVE_ATTRS = ["sex"]
+	SENSITIVE_ATTRS = ["sensitive"]
+
 
 	COMPAS_INPUT_FILE = "DataPreprocessing/dutch.csv"
+	# COMPAS_INPUT_FILE = "dutch.csv"
 
 
 	# load the data and get some stats
@@ -38,6 +40,17 @@ def load_dutch_data():
 	for k in data.keys():
 		data[k] = np.array(data[k])
 
+	age = data["age"]
+	sens = np.zeros(len(age))
+
+	for ind, row in enumerate(age):
+
+		if row <= 5 or row >= 13:
+			sens[ind] = 1
+
+	# print np.sum(sens)
+
+	data["sensitive"] = sens
 
 	""" Feature normalization and one hot encoding """
 	y = data[CLASS_FEATURE]
@@ -110,5 +123,7 @@ def load_dutch_data():
 	# assert(len(feature_names) == X.shape[1])
 	# print "Features we will be using for classification are:", feature_names, "\n"
 	# print x_control
-
+	# print feature_names.index(SENSITIVE_ATTRS[0])
+	# print np.sum(X[:,feature_names.index(SENSITIVE_ATTRS[0])])
 	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0, x_control
+

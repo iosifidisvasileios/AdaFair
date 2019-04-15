@@ -137,7 +137,9 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         # Clear any previous fit results
         self.estimators_ = []
         self.estimator_alphas_ = np.zeros(self.n_estimators, dtype=np.float64)
-        self.estimator_fairness_ = np.ones(self.n_estimators, dtype=np.float64)
+
+        if self.debug:
+            self.conf_scores = []
 
         random_state = check_random_state(self.random_state)
         # if self.debug:
@@ -189,12 +191,16 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
 
             old_weights_sum = np.sum(sample_weight)
 
+        if self.debug:
+            self.get_confidence_scores(X)
 
         return self
 
     def get_weights(self,):
         return [self.W_pos, self.W_neg, self.W_dp, self.W_fp, self.W_dn, self.W_fn]
 
+    def get_confidence_scores(self, X):
+        self.conf_scores = self.decision_function(X)
 
 
     @abstractmethod
@@ -549,23 +555,23 @@ class AdaCostClassifier(BaseWeightBoosting, ClassifierMixin):
                                 sample_weight[idx] *= self.cost_negative * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
                             elif self.csb == "CSB1":
                                 sample_weight[idx] *= self.cost_negative * np.exp( alpha )
-        if self.debug:
-            if iboost !=0:
-                y_predict = self.predict(X)
-                y_predict_probs = self.decision_function(X)
-                incorrect = y_predict != y
-                training_error = np.mean(np.average(incorrect, axis=0))
-                train_auc = sklearn.metrics.balanced_accuracy_score(y, y_predict)
-                train_fairness = self.calculate_fairness(X,y,y_predict)
-
-                y_predict = self.predict(self.X_test)
-                y_predict_probs = self.decision_function(self.X_test)
-                incorrect = y_predict != self.y_test
-                test_error = np.mean(np.average(incorrect, axis=0))
-                test_auc = sklearn.metrics.balanced_accuracy_score(self.y_test, y_predict)
-                test_fairness = self.calculate_fairness(self.X_test,self.y_test,y_predict)
-                self.performance.append(str(iboost) + "," + str(training_error) + ", " + str(train_auc) + ", " + str(train_fairness) + ","+ str(test_error) + ", " + str(test_auc)+ ", " + str(test_fairness))
-                # print str(iboost) + "," + str(training_error) + ", " + str(train_auc) + ", " + str(train_fairness) + ","+ str(test_error) + ", " + str(test_auc)+ ", " + str(test_fairness)
+        # if self.debug:
+        #     if iboost !=0:
+        #         y_predict = self.predict(X)
+        #         y_predict_probs = self.decision_function(X)
+        #         incorrect = y_predict != y
+        #         training_error = np.mean(np.average(incorrect, axis=0))
+        #         train_auc = sklearn.metrics.balanced_accuracy_score(y, y_predict)
+        #         train_fairness = self.calculate_fairness(X,y,y_predict)
+        #
+        #         y_predict = self.predict(self.X_test)
+        #         y_predict_probs = self.decision_function(self.X_test)
+        #         incorrect = y_predict != self.y_test
+        #         test_error = np.mean(np.average(incorrect, axis=0))
+        #         test_auc = sklearn.metrics.balanced_accuracy_score(self.y_test, y_predict)
+        #         test_fairness = self.calculate_fairness(self.X_test,self.y_test,y_predict)
+        #         self.performance.append(str(iboost) + "," + str(training_error) + ", " + str(train_auc) + ", " + str(train_fairness) + ","+ str(test_error) + ", " + str(test_auc)+ ", " + str(test_fairness))
+        #         # print str(iboost) + "," + str(training_error) + ", " + str(train_auc) + ", " + str(train_fairness) + ","+ str(test_error) + ", " + str(test_auc)+ ", " + str(test_fairness)
 
         return sample_weight, alpha, estimator_error
 

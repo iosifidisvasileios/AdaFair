@@ -84,7 +84,7 @@ def load_compas(sa):
 
 
 
-	print collections.Counter(data["sex"])
+	print collections.Counter(data[sa])
 
 	test = pd.DataFrame.from_dict(data)
 	# print test
@@ -153,10 +153,11 @@ def load_compas(sa):
 	y = y[perm]
 	for k in x_control.keys():
 		x_control[k] = x_control[k][perm]
-
+	feature_names.append('target')
 	print "Features we will be using for classification are:", feature_names, "\n"
 
-	if sa == "race":
-		return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 1, x_control
-	elif sa== "sex":
-		return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0, x_control
+	# pd.DataFrame(np.c_[X, y]).to_csv("test_compas_X.csv", header=feature_names)
+	# print np.sum(X[:,feature_names.index(SENSITIVE_ATTRS[0])])
+
+	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0, x_control
+

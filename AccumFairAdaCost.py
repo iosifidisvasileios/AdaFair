@@ -134,16 +134,18 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         # Check parameters
         self._validate_estimator()
 
+        if self.debug:
+            self.conf_scores = []
+
         # Clear any previous fit results
         self.estimators_ = []
 
         self.estimator_alphas_ = np.zeros(self.n_estimators, dtype=np.float64)
-        # self.estimator_errors_ = np.ones(self.n_estimators, dtype=np.float64)
         self.estimator_fairness_ = np.ones(self.n_estimators, dtype=np.float64)
 
         random_state = check_random_state(self.random_state)
-        # if self.debug:
-        #     print  "iteration, alpha , positives , negatives , dp , fp , dn , fn"
+        if self.debug:
+            print  "iteration, alpha , positives , negatives , dp , fp , dn , fn"
 
         old_weights_sum = np.sum(sample_weight)
 
@@ -159,11 +161,9 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             if sample_weight is None:
                 break
 
-            self.tuning_learners.append(0.67*balanced_error + 0.33*cumulative_error + fairness)
-            # self.tuning_learners.append(balanced_error + cumulative_error + 2 * fairness)
+            self.tuning_learners.append(self.c* balanced_error + (1 - self.c)*cumulative_error + fairness)
 
-            self.estimator_alphas_[iboost] = alpha
-            self.estimator_fairness_[iboost] = fairness
+            # self.estimator_alphas_[iboost] = alpha
 
             # Stop if error is zero
             if error == 0.5:
@@ -196,12 +196,21 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             old_weights_sum = np.sum(sample_weight)
 
         best_theta = self.tuning_learners.index(min(self.tuning_learners))
-        print "best #weak learners = "+ str(best_theta)
+        if self.debug:
+            print "best #weak learners = "+ str(best_theta)
+        self.estimators_ = self.estimators_[:best_theta + 1 ]
+        self.estimator_alphas_ = self.estimator_alphas_[:best_theta +1 ]
 
-        self.estimators_ = self.estimators_[:best_theta ]
-        self.estimator_alphas_ = self.estimator_alphas_[:best_theta ]
+        if self.debug:
+            self.get_confidence_scores(X)
 
         return self
+
+
+
+    def get_confidence_scores(self, X):
+        self.conf_scores = self.decision_function(X)
+
 
     def get_weights(self,):
         return [self.W_pos, self.W_neg, self.W_dp, self.W_fp, self.W_dn, self.W_fn]
@@ -448,7 +457,7 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
                  saIndex=None,saValue=None,
                  costs = [1, 1], useFairVoting=False,
                  updateAll=False, debug=False, CSB="CSB2",
-                 X_test=None, y_test=None, decay=True):
+                 X_test=None, y_test=None, decay=True, c = 1):
 
         super(AccumFairAdaCost, self).__init__(
             base_estimator=base_estimator,
@@ -469,6 +478,7 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
         self.cost_non_protected_negative = costs[1]
         self.decay_cost = decay
 
+        self.c = c
         self.saIndex = saIndex
         self.saValue = saValue
         self.algorithm = algorithm
@@ -579,20 +589,16 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
         diff_tnr = tnr_non_protected - tnr_protected
 
         if diff_tpr > 0:
-            self.cost_protected_positive  = (1 + diff_tpr)*self.cost_positive
+            self.cost_protected_positive  = (1 + diff_tpr)
         elif diff_tpr < 0:
-            self.cost_protected_positive = (1 + abs(diff_tpr))*self.cost_positive
+            self.cost_protected_positive = (1 + abs(diff_tpr))
 
         if diff_tnr > 0:
-            self.cost_protected_negative = (1 + diff_tnr)*self.cost_negative
+            self.cost_protected_negative = (1 + diff_tnr)
         elif diff_tpr < 0:
-            self.cost_protected_negative = (1 + abs(diff_tnr))*self.cost_negative
-
-
-        # print "dTPR = " + str((tpr_non_protected - tpr_protected)*100) +", dTNR = " + str((tnr_non_protected - tnr_protected)*100)
+            self.cost_protected_negative = (1 + abs(diff_tnr))
 
         return abs((tpr_non_protected - tpr_protected)) + abs((tnr_non_protected - tnr_protected))
-        # return 1 - (abs((tpr_non_protected - tpr_protected)) + abs((tnr_non_protected - tnr_protected)))/2
 
     def _boost_discrete(self, iboost, X, y, sample_weight, random_state):
         """Implement a single boost using the SAMME discrete algorithm."""
@@ -633,6 +639,7 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
             np.log(n_classes - 1.))
 
         incorrect = y_predict != y
+        self.estimator_alphas_[iboost] = alpha
 
         # Error fraction
         estimator_error = np.mean(np.average(incorrect, weights=sample_weight, axis=0))

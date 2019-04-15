@@ -23,6 +23,7 @@ def load_bank():
 	SENSITIVE_ATTRS = ["marital"]
 
 
+	# COMPAS_INPUT_FILE = "bank-full.csv"
 	COMPAS_INPUT_FILE = "DataPreprocessing/bank-full.csv"
 
 
@@ -111,10 +112,11 @@ def load_bank():
 	# assert(len(feature_names) == X.shape[1])
 	print "Features we will be using for classification are:", feature_names, "\n"
 	# print x_control
+	feature_names.append('target')
 
+	# pd.DataFrame(np.c_[X, y]).to_csv("bank.csv", header=feature_names)
+	# print np.sum(X[:,feature_names.index(SENSITIVE_ATTRS[0])])
 	# return X, y, feature_names.index(SENSITIVE_ATTRS[0]),0
 	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0, x_control
 
-# Data_type = 1
-# X, y, x_control = load_bank()
 # sensitive_attrs = x_control.keys()
