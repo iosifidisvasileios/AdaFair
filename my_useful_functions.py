@@ -1,10 +1,7 @@
 import matplotlib
 matplotlib.use('Agg')
-from sklearn.metrics import balanced_accuracy_score
 
 from sklearn.metrics import accuracy_score
-from sklearn.metrics import average_precision_score
-from sklearn.metrics import roc_auc_score
 import numpy
 import matplotlib.pyplot as plt
 
@@ -417,25 +414,25 @@ def plot_my_results(results, names, output_dir, dataset):
     # plt.title("Performance for " + dataset)
     plt.savefig(output_dir + "_performance.png",bbox_inches='tight', dpi=200)
     print names
-    print "accuracy " + str(accuracy_list)
-    print "accuracy dev " + str(std_accuracy_list)
-    print "balanced_accuracy " + str(balanced_accuracy_list)
-    print "balanced_accuracy dev " + str(std_balanced_accuracy_list)
+    print "accuracy_lis t= " + str(accuracy_list)
+    print "std_accuracy_list = " + str(std_accuracy_list)
+    print "balanced_accuracy_list=  " + str(balanced_accuracy_list)
+    print "std_balanced_accuracy_list = " + str(std_balanced_accuracy_list)
 
-    print "fairness " + str(fairness_list)
-    print "fairness_dev " + str(std_fairness_list)
+    print "fairness_list=  " + str(fairness_list)
+    print "std_fairness_list = " + str(std_fairness_list)
 
-    print "tpr_protected_list " + str(tpr_protected_list)
-    print "std_tpr_protected_list " + str(std_tpr_protected_list)
+    print "tpr_protected_list = " + str(tpr_protected_list)
+    print "std_tpr_protected_list = " + str(std_tpr_protected_list)
 
-    print "tpr_non_protected_list " + str(tpr_non_protected_list)
-    print "std_tpr_non_protected_list " + str(std_tpr_non_protected_list)
+    print "tpr_non_protected_list = " + str(tpr_non_protected_list)
+    print "std_tpr_non_protected_list = " + str(std_tpr_non_protected_list)
 
-    print "tnr_protected_list " + str(tnr_protected_list)
-    print "std_tnr_protected_list " + str(std_tnr_protected_list)
+    print "tnr_protected_list = " + str(tnr_protected_list)
+    print "std_tnr_protected_list = " + str(std_tnr_protected_list)
 
-    print "tnr_non_protected_list " + str(tnr_non_protected_list)
-    print "std_tnr_non_protected_list " + str(std_tnr_non_protected_list)
+    print "tnr_non_protected_list = " + str(tnr_non_protected_list)
+    print "std_tnr_non_protected_list = " + str(std_tnr_non_protected_list)
 
 
 
