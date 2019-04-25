@@ -4,19 +4,12 @@ from multiprocessing import Process, Lock
 import pickle
 import os
 import matplotlib
-import numpy
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import ShuffleSplit
-from sklearn.naive_bayes import GaussianNB
 
 matplotlib.use('Agg')
 import sys
 import pandas as pd
 
-from sklearn.calibration import CalibratedClassifierCV, calibration_curve
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
 
 from AccumFairAdaCost import AccumFairAdaCost
@@ -29,9 +22,7 @@ from call_eq_odds import Model as calibModel
 import funcs_disp_mist as fdm
 
 import time
-from sklearn.model_selection import StratifiedKFold
 from AdaCost import AdaCostClassifier
-from FairAdaCost import FairAdaCost
 
 from load_dutch_data import load_dutch_data
 # from load_german import load_german

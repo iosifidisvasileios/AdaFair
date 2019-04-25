@@ -69,6 +69,7 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         self.W_dn = 0.
         self.W_fn = 0.
         self.performance = []
+        self.objective = []
         self.learning_rate = learning_rate
         self.random_state = random_state
         self.tuning_learners = []
@@ -474,12 +475,6 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
             learning_rate=learning_rate,
             random_state=random_state)
 
-        # self.cost_positive_final = costs[0]
-        # self.cost_negative_final = costs[1]
-        # self.cost_positive = costs[0]
-        # self.cost_negative = costs[1]
-
-
         self.cost_protected_positive = 1
         self.cost_non_protected_positive = 1
 
@@ -615,6 +610,56 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
 
         return abs((tpr_non_protected - tpr_protected)) + abs((tnr_non_protected - tnr_protected))
 
+    def measure_fairness_for_visualization(self, data, labels, predictions):
+
+        tp_protected = 0.
+        tn_protected = 0.
+        fp_protected = 0.
+        fn_protected = 0.
+
+        tp_non_protected = 0.
+        tn_non_protected = 0.
+        fp_non_protected = 0.
+        fn_non_protected = 0.
+        for idx, val in enumerate(data):
+            # protrcted population
+            if val[self.saIndex] == self.saValue:
+                # correctly classified
+                if labels[idx] == predictions[idx]:
+                    if labels[idx] == 1:
+                        tp_protected +=1
+                    else:
+                        tn_protected +=1
+                #misclassified
+                else:
+                    if labels[idx] == 1:
+                        fn_protected +=1
+                    else:
+                        fp_protected +=1
+
+            else:
+                # correctly classified
+                if labels[idx] == predictions[idx]:
+                    if labels[idx] == 1:
+                        tp_non_protected += 1
+                    else:
+                        tn_non_protected += 1
+                # misclassified
+                else:
+                    if labels[idx] == 1:
+                        fn_non_protected += 1
+                    else:
+                        fp_non_protected += 1
+
+
+        tpr_protected = tp_protected/(tp_protected + fn_protected)
+        tnr_protected = tn_protected/(tn_protected + fp_protected)
+
+        tpr_non_protected = tp_non_protected/(tp_non_protected + fn_non_protected)
+        tnr_non_protected = tn_non_protected/(tn_non_protected + fp_non_protected)
+
+        return abs((tpr_non_protected - tpr_protected)) + abs((tnr_non_protected - tnr_protected))
+
     def _boost_discrete(self, iboost, X, y, sample_weight, random_state):
         """Implement a single boost using the SAMME discrete algorithm."""
         estimator = self._make_estimator(random_state=random_state)
@@ -694,29 +739,34 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
                             sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
                         elif self.csb == "CSB1":
                             sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha )
-        # if self.debug:
-        #     if iboost !=0:
-        #         y_predict = self.predict(X)
-        #         y_predict_probs = self.decision_function(X)
-        #         incorrect = y_predict != y
-        #         training_error = np.mean(np.average(incorrect, axis=0))
-        #         train_auc = sklearn.metrics.balanced_accuracy_score(y, y_predict)
-        #         train_fairness = self.calculate_fairness(X,y,y_predict)
-        #
-        #         y_predict = self.predict(self.X_test)
-        #         y_predict_probs = self.decision_function(self.X_test)
-        #         incorrect = y_predict != self.y_test
-        #         test_error = np.mean(np.average(incorrect, axis=0))
-        #         test_auc = sklearn.metrics.balanced_accuracy_score(self.y_test, y_predict)
-        #         test_fairness = self.calculate_fairness(self.X_test,self.y_test,y_predict)
-        #
-        #         self.performance.append(str(iboost) + "," + str(training_error) + ", " + str(train_auc) + ", " + str(train_fairness) + "," + str(test_error) + ", " + str(test_auc) + ", " + str(test_fairness))
-                # print str(iboost) + "," + str(training_error) + ", " + str(train_auc) + ", " + str(train_fairness) + ","+ str(test_error) + ", " + str(test_auc)+ ", " + str(test_fairness)
+        if self.debug:
+            y_predict = self.predict(X)
+            incorrect = y_predict != y
+            train_error = np.mean(np.average(incorrect, axis=0))
+            train_bal_error = 1 - sklearn.metrics.balanced_accuracy_score(y, y_predict)
+            train_fairness = self.measure_fairness_for_visualization(X,y,y_predict)
+
+            test_error= 0
+            test_bal_error= 0
+            test_fairness= 0
+            if self.X_test:
+                y_predict = self.predict(self.X_test)
+                incorrect = y_predict != self.y_test
+                test_error = np.mean(np.average(incorrect, axis=0))
+                test_bal_error = 1 - sklearn.metrics.balanced_accuracy_score(self.y_test, y_predict)
+                test_fairness = self.measure_fairness_for_visualization(self.X_test,self.y_test,y_predict)
+
+            self.objective.append(train_error * (1-self.c) + train_bal_error*self.c + train_fairness)
+            self.performance.append(str(iboost) + "," + str(train_error) + ", " + str(train_bal_error) + ", " + str(train_fairness) + "," + str(test_error) + ", " + str(test_bal_error) + ", " + str(test_fairness))
+            print str(iboost) + "," + str(train_error) + ", " + str(train_bal_error) + ", " + str(train_fairness) + ","+ str(test_error) + ", " + str(test_bal_error)+ ", " + str(test_fairness)
 
         return sample_weight, alpha, estimator_error, fairness, cumulative_balanced_error, cumulative_error
 
     def get_performance_over_iterations(self):
         return self.performance
+    #
+    def get_objective(self):
+        return self.objective
     #
     # def get_weights_over_iterations(self):
     #     return self.weight_list[self.theta]

@@ -300,6 +300,59 @@ def plot_results(init, max_cost, step, summary_performance, summary_weights, out
     # plt.show()
 
 
+def plot_per_round(rounds, results, objective, output_dir ):
+    train_error_list = []
+    train_bal_error_list = []
+    train_fairness = []
+
+    test_error_list = []
+    test_bal_error_list = []
+    test_fairness = []
+    objective_list = []
+    for i in numpy.arange(0, rounds):
+
+        line = results[i].split(",")
+
+        objective_list.append(objective[i])
+        train_error_list.append(float(line[1]))
+        train_bal_error_list.append(float(line[2]))
+        train_fairness.append(float(line[3]))
+        test_error_list.append(float(line[4]))
+        test_bal_error_list.append(float(line[5]))
+        test_fairness.append(float(line[6]))
+
+    step_list = [i for i in range(0, rounds)]
+
+    print train_fairness
+    print train_error_list
+    print train_bal_error_list
+    print step_list
+    plt.figure()
+    plt.grid(True)
+
+    plt.plot(step_list, train_error_list, '--', label='Train Error')
+    # plt.plot(step_list, test_error_list, '-<', label='Test Error')
+
+    plt.plot(step_list, train_bal_error_list, '-.', label='Train Bal.Error')
+    # plt.plot(step_list, test_bal_error_list, '-x', label='Test Bal.Error')
+
+    plt.plot(step_list, train_fairness, '-', label='Train E.O.')
+    plt.plot(step_list, objective_list, ':', label='Objective')
+    # plt.plot(step_list, test_fairness, '-o', label='Test E.O.')
+
+    # plt.figure(figsize=(10, 10))
+    plt.rcParams.update({'font.size': 12})
+    # plt.ylim([0,1])
+    # plt.yticks(numpy.arange(0, 1.00001, step=0.05))
+
+    plt.xlabel('Rounds')
+    plt.ylabel('(%)')
+    plt.legend(loc='best',ncol=1, shadow=False)
+    # plt.title("Performance for " + dataset)
+    plt.savefig(output_dir,bbox_inches='tight', dpi=200)
+
+
+
 def plot_my_results(results, names, output_dir, dataset):
     accuracy_list = []
     balanced_accuracy_list = []
