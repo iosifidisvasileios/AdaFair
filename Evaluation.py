@@ -74,7 +74,8 @@ def run_eval(dataset, iterations):
     # suffixes = ['adaboost', 'Sin.1', 'Sin.2', 'Cumul.1', 'Cumul.2', 'zafar', 'Hardt', 'Pleiss']
     # suffixes = ['adaboost', 'Cumul.1', 'Cumul.2', 'zafar', 'Hardt', 'Pleiss']
     # suffixes = ['adaboost', 'Cumul.1', 'Cumul.2', 'zafar', 'Hardt']
-    suffixes = ['Hardt et al.','Zafar et al.', 'Adaboost', 'AFB' ]
+    # suffixes = ['Hardt et al.','Zafar et al.', 'Adaboost', 'AFB' ]
+    suffixes = ['Zafar et al.', 'Adaboost', 'AdaFair' ]
     create_temp_files(dataset, suffixes)
 
     if dataset == "compass-gender":
@@ -137,14 +138,14 @@ def run_eval(dataset, iterations):
             X_train, X_test, X_valid = X[train_index], X[test_index], X[valid_index]
             y_train, y_test, y_valid = y[train_index], y[test_index], y[valid_index]
 
-            for proc in range(0, 4):
+            for proc in range(0, 3):
                 if dataset == "kdd" and proc == 1:
                     continue
 
-                if proc > 1:
+                if proc > 0:
                     threads.append(Process(target=train_classifier, args=( X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc],proc, 200, 1)))
 
-                elif proc == 1:
+                elif proc == 0:
                     temp_x_control_train = defaultdict(list)
                     temp_x_control_test = defaultdict(list)
 
@@ -160,8 +161,8 @@ def run_eval(dataset, iterations):
                                                                      cons_params, loss_function, EPS,
                                                                      dataset + suffixes[proc], mutex[proc],
                                                                      sensitive_attrs)))
-                elif proc == 0:
-                    threads.append(Process(target=train_hardt, args=(X_train, X_test, y_train, y_test, X_valid, y_valid ,sa_index,p_Group, dataset + suffixes[proc], mutex[proc])))
+                # elif proc == 0:
+                #     threads.append(Process(target=train_hardt, args=(X_train, X_test, y_train, y_test, X_valid, y_valid ,sa_index,p_Group, dataset + suffixes[proc], mutex[proc])))
 
                 # elif proc == 5:
                 #     if dataset == "kdd":
@@ -333,15 +334,15 @@ def train_zafar(x_train, y_train, x_control_train, x_test, y_test, x_control_tes
 
 
 def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, mode, base_learners, c):
-    if mode == 2:
-        classifier = AdaCostClassifier(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB2")
+    if mode == 1:
+        classifier = AdaCostClassifier(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB1")
     # elif mode == 1:
     #     classifier = FairAdaCost(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB1")
     # elif mode == 2:
     #     classifier = FairAdaCost(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB2")
     # elif mode == 1:
     #     classifier = AccumFairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB1", c=c)
-    elif mode == 3:
+    elif mode == 2:
         classifier = AccumFairAdaCost( n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2", c=c)
 
     classifier.fit(X_train, y_train)

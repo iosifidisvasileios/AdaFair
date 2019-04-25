@@ -1,0 +1,42 @@
+
+Number of people bank yes
+-1    35337
+ 1     4667
+dtype: int64
+
+
+
+Number of married
+married    27214
+single     12790
+dtype: int64
+
+
+Features we will be using for classification are: ['age', 'job_admin.', 'job_blue-collar', 'job_entrepreneur', 'job_housemaid', 'job_management', 'job_retired', 'job_self-employed', 'job_services', 'job_student', 'job_technician', 'job_unemployed', 'job_unknown', 'marital', 'education_primary', 'education_secondary', 'education_tertiary', 'education_unknown', 'default', 'balance', 'housing', 'loan', 'contact_cellular', 'contact_telephone', 'contact_unknown', 'day', 'month_apr', 'month_aug', 'month_dec', 'month_feb', 'month_jan', 'month_jul', 'month_jun', 'month_mar', 'month_may', 'month_nov', 'month_oct', 'month_sep', 'duration', 'campaign', 'pdays', 'previous', 'poutcome_failure', 'poutcome_other', 'poutcome_success', 'poutcome_unknown'] 
+
+/home/iosifidis/.local/lib/python2.7/site-packages/numpy/core/fromnumeric.py:3118: RuntimeWarning: Mean of empty slice.
+  out=out, **kwargs)
+/home/iosifidis/.local/lib/python2.7/site-packages/numpy/core/_methods.py:85: RuntimeWarning: invalid value encountered in double_scalars
+  ret = ret.dtype.type(ret / rcount)
+/home/iosifidis/.local/lib/python2.7/site-packages/numpy/core/_methods.py:140: RuntimeWarning: Degrees of freedom <= 0 for slice
+  keepdims=keepdims)
+/home/iosifidis/.local/lib/python2.7/site-packages/numpy/core/_methods.py:110: RuntimeWarning: invalid value encountered in true_divide
+  arrmean, rcount, out=arrmean, casting='unsafe', subok=False)
+/home/iosifidis/.local/lib/python2.7/site-packages/numpy/core/_methods.py:132: RuntimeWarning: invalid value encountered in double_scalars
+  ret = ret.dtype.type(ret / rcount)
+elapsed time = 273.916814089
+['Zafar et al.', 'Adaboost', 'AdaFair']
+accuracy [nan, 0.8996850314968503, 0.8738176182381763]
+accuracy dev [nan, 0.001796379573424245, 0.012432088002102212]
+balanced_accuracy [nan, 0.6632270990030043, 0.7860198481401537]
+balanced_accuracy dev [nan, 0.004363932699547422, 0.020544993619172756]
+fairness [nan, 0.08249658009928729, 0.04594872050013955]
+fairness_dev [nan, 0.03281052957573549, 0.022990425061320912]
+tpr_protected_list [nan, 0.32677145661171714, 0.6737057522713018]
+std_tpr_protected_list [nan, 0.013417322804481182, 0.06565841038152437]
+tpr_non_protected_list [nan, 0.39409483471002515, 0.6681283470427762]
+std_tpr_non_protected_list [nan, 0.021950326710983032, 0.06314609138218173]
+tnr_protected_list [nan, 0.9764610045095997, 0.9073496467673461]
+std_tnr_protected_list [nan, 0.0018095507854181854, 0.021830312852951377]
+tnr_non_protected_list [nan, 0.9617404269121652, 0.8853942329145745]
+std_tnr_non_protected_list [nan, 0.0035731244455386568, 0.023892618803700715]

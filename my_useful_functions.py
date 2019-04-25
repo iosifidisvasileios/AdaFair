@@ -150,26 +150,26 @@ def plot_results_of_c_impact(csb1, csb2, steps, output_dir, dataset):
         # csb2_tnr_protected_list.append(numpy.mean(tnr_protected))
         # csb2_tnr_non_protected_list.append(numpy.mean(tnr_non_protected))
 
-    plt.figure(figsize=(7, 7))
+    plt.figure(figsize=(7, 5))
     plt.grid(True)
     plt.rcParams.update({'font.size': 14})
 
-    plt.plot(steps, csb1_accuracy_list, '-b', label='AFB CSB1 Accuracy')
-    plt.plot(steps, csb2_accuracy_list, '-r', label='AFB CSB2 Accuracy')
+    plt.plot(steps, csb1_accuracy_list, '-.', label='AFB CSB1 Accuracy')
+    plt.plot(steps, csb2_accuracy_list, '--', label='AFB CSB2 Accuracy')
 
-    plt.plot(steps, csb1_balanced_accuracy_list, '--', label='AFB CSB1 B.Accuracy')
-    plt.plot(steps, csb2_balanced_accuracy_list, ':', label='AFB CSB2 B.Accuracy')
+    plt.plot(steps, csb1_balanced_accuracy_list, '-x', label='AFB CSB1 B.Accuracy')
+    plt.plot(steps, csb2_balanced_accuracy_list, '-*', label='AFB CSB2 B.Accuracy')
 
     plt.plot(steps, csb1_fairness_list, '-o', label='AFB CSB1 E.O.')
     plt.plot(steps, csb2_fairness_list, '-v', label='AFB CSB2 E.O.')
 
-    plt.legend(loc='best')
+    plt.legend(loc='best',shadow=False)
 
     plt.xlabel('c')
     plt.ylabel('(%)')
     # plt.title("Impact of c for " + dataset + " dataset")
 
-    plt.savefig(output_dir + dataset + "_c_impact.png")
+    plt.savefig(output_dir + dataset + "_c_impact.png", bbox_inches='tight', dpi=200)
 
 
 def plot_results(init, max_cost, step, summary_performance, summary_weights, output_dir, title, plot_weights=True):
@@ -353,7 +353,39 @@ def plot_my_results(results, names, output_dir, dataset):
         std_tnr_protected_list.append(numpy.std(tnr_protected))
         std_tnr_non_protected_list.append(numpy.std(tnr_non_protected))
 
-    plt.figure(figsize=(11, 9))
+    # plt.figure(figsize=(11, 9))
+    # plt.rcParams.update({'font.size': 14})
+    # plt.ylim([0,1])
+    # plt.yticks(numpy.arange(0, 1, step=0.05))
+    #
+    # plt.setp(plt.gca().get_xticklabels(), rotation=20, horizontalalignment='right')
+    #
+    # plt.grid(True, axis='y')
+    # index = numpy.arange(0, 8, step=1.3)
+    # # index = numpy.arange(7)
+    # bar_width = 0.175
+    #
+    #
+    #
+    # plt.xticks(index + 1.5*bar_width ,
+    #            ('Accuracy', 'Balanced Accuracy', 'Equal.Odds', 'TPR Prot.', 'TPR Non-Prot.', 'TNR Prot.', 'TNR Non-Prot.'))
+    #
+    # colors = ['b','g','r','c','m','y','k', 'dimgray']
+    # for i in range(0, len(names)):
+    #     plt.bar(index + bar_width * i,
+    #             [accuracy_list[i], balanced_accuracy_list[i], fairness_list[i], tpr_protected_list[i],
+    #              tpr_non_protected_list[i], tnr_protected_list[i], tnr_non_protected_list[i]], bar_width,
+    #             yerr=[std_accuracy_list[i], std_balanced_accuracy_list[i], std_fairness_list[i],
+    #                   std_tpr_protected_list[i], std_tpr_non_protected_list[i], std_tnr_protected_list[i],
+    #                   std_tnr_non_protected_list[i]],
+    #             label=names[i], color=colors[i],edgecolor='black')
+    #
+    # plt.legend(loc='best',ncol=2, shadow=False)
+    # plt.ylabel('(%)')
+    # plt.title("Performance for " + dataset)
+    # plt.savefig(output_dir + "_performance.png",bbox_inches='tight', dpi=400)
+    #
+    plt.figure(figsize=(9, 9))
     plt.rcParams.update({'font.size': 14})
     plt.ylim([0,1])
     plt.yticks(numpy.arange(0, 1, step=0.05))
@@ -368,7 +400,7 @@ def plot_my_results(results, names, output_dir, dataset):
 
 
     plt.xticks(index + 1.5*bar_width ,
-               ('Accuracy', 'Balanced Accuracy', 'Equal.Odds', 'TPR Prot.', 'TPR Non-Prot.', 'TNR Prot.', 'TNR Non-Prot.'))
+               ('Accuracy', 'Balanced Accuracy', 'Equalized Odds', 'TPR Prot.', 'TPR Non-Prot.', 'TNR Prot.', 'TNR Non-Prot.'))
 
     colors = ['b','g','r','c','m','y','k', 'dimgray']
     for i in range(0, len(names)):
@@ -380,10 +412,10 @@ def plot_my_results(results, names, output_dir, dataset):
                       std_tnr_non_protected_list[i]],
                 label=names[i], color=colors[i],edgecolor='black')
 
-    plt.legend(loc='best',ncol=2, shadow=False)
+    plt.legend(loc='best',ncol=1, shadow=False)
     plt.ylabel('(%)')
-    plt.title("Performance for " + dataset)
-    plt.savefig(output_dir + "_performance.png",bbox_inches='tight', dpi=400)
+    # plt.title("Performance for " + dataset)
+    plt.savefig(output_dir + "_performance.png",bbox_inches='tight', dpi=200)
     print names
     print "accuracy " + str(accuracy_list)
     print "accuracy dev " + str(std_accuracy_list)

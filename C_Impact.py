@@ -86,7 +86,7 @@ def run_eval(dataset):
     else:
         exit(1)
 
-    suffixes = ['AFB CSB1', 'AFB CSB2']
+    suffixes = ['AdaFair NoConf.', 'AdaFair']
 
     base_learners = 200
     steps = numpy.arange(0, 1.001, step=0.2)

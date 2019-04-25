@@ -148,6 +148,12 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             print  "iteration, alpha , positives , negatives , dp , fp , dn , fn"
 
         old_weights_sum = np.sum(sample_weight)
+        pos, neg, dp, fp, dn, fn = self.calculate_weights(X, y, sample_weight)
+
+        if self.debug:
+            self.weight_list.append(
+                'init' + "," + str(0) + "," + str(pos) + ", " + str(neg) + ", " + str(dp) + ", " + str(
+                    fp) + ", " + str(dn) + ", " + str(fn))
 
         for iboost in range(self.n_estimators):
             # Boosting step
@@ -196,10 +202,11 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             old_weights_sum = np.sum(sample_weight)
 
         best_theta = self.tuning_learners.index(min(self.tuning_learners))
+        self.theta = best_theta + 1
         if self.debug:
-            print "best #weak learners = "+ str(best_theta)
-        self.estimators_ = self.estimators_[:best_theta + 1 ]
-        self.estimator_alphas_ = self.estimator_alphas_[:best_theta +1 ]
+            print "best #weak learners = "+ str(self.theta )
+        self.estimators_ = self.estimators_[:self.theta  ]
+        self.estimator_alphas_ = self.estimator_alphas_[:self.theta  ]
 
         if self.debug:
             self.get_confidence_scores(X)
@@ -207,10 +214,15 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         return self
 
 
+    def get_weights_over_iterations(self,):
+        return self.weight_list[self.theta]
 
     def get_confidence_scores(self, X):
         self.conf_scores = self.decision_function(X)
 
+
+    def get_initial_weights(self):
+        return self.weight_list[0]
 
     def get_weights(self,):
         return [self.W_pos, self.W_neg, self.W_dp, self.W_fp, self.W_dn, self.W_fn]
@@ -455,8 +467,7 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
                  algorithm='SAMME',
                  random_state=None,
                  saIndex=None,saValue=None,
-                 costs = [1, 1], useFairVoting=False,
-                 updateAll=False, debug=False, CSB="CSB2",
+                 debug=False, CSB="CSB2",
                  X_test=None, y_test=None, decay=True, c = 1):
 
         super(AccumFairAdaCost, self).__init__(
@@ -465,24 +476,24 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
             learning_rate=learning_rate,
             random_state=random_state)
 
-        self.cost_positive_final = costs[0]
-        self.cost_negative_final = costs[1]
-        self.cost_positive = costs[0]
-        self.cost_negative = costs[1]
-        self.useFairVotes= useFairVoting
+        # self.cost_positive_final = costs[0]
+        # self.cost_negative_final = costs[1]
+        # self.cost_positive = costs[0]
+        # self.cost_negative = costs[1]
 
-        self.cost_protected_positive = costs[0]
-        self.cost_non_protected_positive = costs[0]
 
-        self.cost_protected_negative = costs[1]
-        self.cost_non_protected_negative = costs[1]
+        self.cost_protected_positive = 1
+        self.cost_non_protected_positive = 1
+
+        self.cost_protected_negative = 1
+        self.cost_non_protected_negative = 1
         self.decay_cost = decay
 
         self.c = c
         self.saIndex = saIndex
         self.saValue = saValue
         self.algorithm = algorithm
-        self.updateAll = updateAll
+
         self.debug = debug
         self.csb = CSB
         self.X_test = X_test
@@ -588,15 +599,21 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
         diff_tpr = tpr_non_protected - tpr_protected
         diff_tnr = tnr_non_protected - tnr_protected
 
+        self.cost_protected_positive = self.cost_non_protected_positive = self.cost_protected_negative = self.cost_non_protected_negative = 1
+
+        # print self.cost_protected_positive
+        # print self.cost_non_protected_positive
+
+
         if diff_tpr > 0:
             self.cost_protected_positive  = (1 + diff_tpr)
         elif diff_tpr < 0:
-            self.cost_protected_positive = (1 + abs(diff_tpr))
+            self.cost_non_protected_positive = (1 + abs(diff_tpr))
 
         if diff_tnr > 0:
             self.cost_protected_negative = (1 + diff_tnr)
         elif diff_tpr < 0:
-            self.cost_protected_negative = (1 + abs(diff_tnr))
+            self.cost_non_protected_negative = (1 + abs(diff_tnr))
 
         return abs((tpr_non_protected - tpr_protected)) + abs((tnr_non_protected - tnr_protected))
 
@@ -653,71 +670,32 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
             cumulative_balanced_error = 1 - sklearn.metrics.balanced_accuracy_score(y, y_predict)
             fairness = 1
 
-        if self.updateAll:
-        # Only boost the weights if I will fit again
-            if not iboost == self.n_estimators - 1:
-                # Only boost positive weights
-                for idx, row in enumerate(sample_weight):
-                    if y[idx] == 1 and y_predict[idx] != 1:
-                        if X[idx][self.saIndex] == self.saValue:
-                            if self.csb == "CSB2":
-                                sample_weight[idx] *=  self.cost_protected_positive * np.exp(alpha * max(proba[idx][0], proba[idx][1]))
-                            elif self.csb == "CSB1":
-                                sample_weight[idx] *=  self.cost_protected_positive * np.exp(alpha )
-                        else:
-                            if self.csb == "CSB2":
-                                sample_weight[idx] *=  self.cost_non_protected_positive * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
-                            elif self.csb == "CSB1":
-                                sample_weight[idx] *=  self.cost_non_protected_positive * np.exp( alpha )
-                    elif y[idx] == -1 and y_predict[idx] != -1:
-                        if X[idx][self.saIndex] == self.saValue:
-                            if self.csb == "CSB2":
-                                sample_weight[idx] *=  self.cost_protected_negative *np.exp( alpha * max(proba[idx][0], proba[idx][1]))
-                            elif self.csb == "CSB1":
-                                sample_weight[idx] *=  self.cost_protected_negative *np.exp( alpha )
-                        else:
-                            if self.csb == "CSB2":
-                                sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
-                            elif self.csb == "CSB1":
-                                sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha )
-                    elif y[idx] == 1 and y_predict[idx] == 1:
-                        if self.csb == "CSB2":
-                            sample_weight[idx] *= self.cost_positive * np.exp(-alpha * max(proba[idx][0], proba[idx][1]))
-                        elif self.csb == "CSB1":
-                            sample_weight[idx] *= self.cost_positive * np.exp(-alpha )
 
-                    elif y[idx] == -1 and y_predict[idx] == -1:
+        if not iboost == self.n_estimators - 1:
+            for idx, row in enumerate(sample_weight):
+                if y[idx] == 1 and y_predict[idx] != 1:
+                    if X[idx][self.saIndex] == self.saValue:
                         if self.csb == "CSB2":
-                            sample_weight[idx] *= self.cost_negative * np.exp(-alpha * max(proba[idx][0], proba[idx][1]))
+                            sample_weight[idx] *=  self.cost_protected_positive * np.exp(alpha * max(proba[idx][0], proba[idx][1]))
                         elif self.csb == "CSB1":
-                            sample_weight[idx] *= self.cost_negative * np.exp(-alpha )
-        else:
-            if not iboost == self.n_estimators - 1:
-                # Only boost positive weights
-                for idx, row in enumerate(sample_weight):
-                    if y[idx] == 1 and y_predict[idx] != 1:
-                        if X[idx][self.saIndex] == self.saValue:
-                            if self.csb == "CSB2":
-                                sample_weight[idx] *=  self.cost_protected_positive * np.exp(alpha * max(proba[idx][0], proba[idx][1]))
-                            elif self.csb == "CSB1":
-                                sample_weight[idx] *=  self.cost_protected_positive * np.exp(alpha )
-                        else:
-                            if self.csb == "CSB2":
-                                sample_weight[idx] *=  self.cost_non_protected_positive * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
-                            elif self.csb == "CSB1":
-                                sample_weight[idx] *=  self.cost_non_protected_positive * np.exp( alpha )
+                            sample_weight[idx] *=  self.cost_protected_positive * np.exp(alpha )
+                    else:
+                        if self.csb == "CSB2":
+                            sample_weight[idx] *=  self.cost_non_protected_positive * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
+                        elif self.csb == "CSB1":
+                            sample_weight[idx] *=  self.cost_non_protected_positive * np.exp( alpha )
 
-                    elif y[idx] == -1 and y_predict[idx] != -1:
-                        if X[idx][self.saIndex] == self.saValue:
-                            if self.csb == "CSB2":
-                                sample_weight[idx] *=  self.cost_protected_negative *np.exp( alpha * max(proba[idx][0], proba[idx][1]))
-                            elif self.csb == "CSB1":
-                                sample_weight[idx] *=  self.cost_protected_negative *np.exp( alpha )
-                        else:
-                            if self.csb == "CSB2":
-                                sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
-                            elif self.csb == "CSB1":
-                                sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha )
+                elif y[idx] == -1 and y_predict[idx] != -1:
+                    if X[idx][self.saIndex] == self.saValue:
+                        if self.csb == "CSB2":
+                            sample_weight[idx] *=  self.cost_protected_negative *np.exp( alpha * max(proba[idx][0], proba[idx][1]))
+                        elif self.csb == "CSB1":
+                            sample_weight[idx] *=  self.cost_protected_negative *np.exp( alpha )
+                    else:
+                        if self.csb == "CSB2":
+                            sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
+                        elif self.csb == "CSB1":
+                            sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha )
         # if self.debug:
         #     if iboost !=0:
         #         y_predict = self.predict(X)
@@ -741,9 +719,9 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
 
     def get_performance_over_iterations(self):
         return self.performance
-
-    def get_weights_over_iterations(self):
-        return self.weight_list
+    #
+    # def get_weights_over_iterations(self):
+    #     return self.weight_list[self.theta]
 
     def predict(self, X):
         """Predict classes for X.
@@ -792,11 +770,9 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
         n_classes = self.n_classes_
         classes = self.classes_[:, np.newaxis]
 
-        if self.useFairVotes:
-            # pred = sum(estimator.predict_proba(X) * w * f for estimator, w, f in zip(self.estimators_, self.estimator_alphas_, self.estimator_fairness_))
-            pred = sum((estimator.predict(X)== classes).T * w * f for estimator, w, f in zip(self.estimators_, self.estimator_alphas_, self.estimator_fairness_))
-        else:
-            pred = sum((estimator.predict(X)== classes).T * w  for estimator, w in zip(self.estimators_, self.estimator_alphas_))
+
+
+        pred = sum((estimator.predict(X)== classes).T * w  for estimator, w in zip(self.estimators_, self.estimator_alphas_))
             # pred = sum(estimator.predict_proba(X) * w for estimator, w,  in zip(self.estimators_, self.estimator_alphas_))
         pred /= self.estimator_alphas_.sum()
         if n_classes == 2:
@@ -831,10 +807,8 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
         if n_classes == 1:
             return np.ones((X.shape[0], 1))
 
-        if self.useFairVotes:
-            proba = sum(estimator.predict_proba(X) * w * f for estimator, w, f in zip(self.estimators_,self.estimator_alphas_, self.estimator_fairness_))
-        else:
-            proba = sum(estimator.predict_proba(X) * w for estimator, w in zip(self.estimators_,self.estimator_alphas_))
+
+        proba = sum(estimator.predict_proba(X) * w for estimator, w in zip(self.estimators_,self.estimator_alphas_))
 
         proba /= self.estimator_alphas_.sum()
         proba = np.exp((1. / (n_classes - 1)) * proba)

@@ -7,7 +7,6 @@ import matplotlib
 import numpy
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import ShuffleSplit
-from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.naive_bayes import GaussianNB
 
 matplotlib.use('Agg')
@@ -72,7 +71,7 @@ def predict(clf, X_test, y_test, sa_index, p_Group):
 
 
 def run_eval(dataset, iterations):
-    suffixes = ['Zafar et al.', 'Adaboost', 'AFB_CSB1', 'AFB_CSB2' ]
+    suffixes = ['Zafar et al.', 'Adaboost', 'AdaFair' ]
     create_temp_files(dataset, suffixes)
 
     if dataset == "compass-gender":
@@ -89,11 +88,14 @@ def run_eval(dataset, iterations):
         X, y, sa_index, p_Group, x_control = load_bank()
     elif dataset == "kdd":
         X, y, sa_index, p_Group, x_control = load_kdd()
+        suffixes = [None,'Adaboost', 'AdaFair']
+
     else:
         exit(1)
     create_temp_files(dataset, suffixes)
 
-    tau = 5.0
+    # init parameters for zafar method (default settings)
+    tau = 3.0
     mu = 1.2
     cons_type = 4
     sensitive_attrs = x_control.keys()
@@ -105,7 +107,7 @@ def run_eval(dataset, iterations):
 
     threads = []
     mutex = []
-    for lock in range(0, 4):
+    for lock in range(0, 8):
         mutex.append(Lock())
 
     random.seed(12345)
@@ -113,24 +115,21 @@ def run_eval(dataset, iterations):
     for iter in range(0, iterations):
         start = time.time()
 
-        temp_shuffle_array = [i for i in range(0, len(X))]
-        random.shuffle(temp_shuffle_array)
+        sss = ShuffleSplit(n_splits=1, test_size=0.5)
 
-        train1 = temp_shuffle_array[: int(len(X)/2)]
-        test1  = temp_shuffle_array[int(len(X)/2): ]
+        for train_index, test_index in sss.split(X, y):
 
-        train2 = temp_shuffle_array[int(len(X)/2):]
-        test2  = temp_shuffle_array[:int(len(X)/2)]
-
-        for train_index, test_index in [[train1, test1],[train2, test2]]:
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
 
-            for proc in range(0, 4):
-                if dataset == "kdd" and proc == 1:
+            for proc in range(0, 3):
+                if proc == 0 :
                     continue
 
-                if proc == 0:
+                if proc > 0:
+                    threads.append(Process(target=train_classifier, args=( X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc],proc, 200, 1)))
+
+                elif proc == 0:
                     temp_x_control_train = defaultdict(list)
                     temp_x_control_test = defaultdict(list)
 
@@ -146,8 +145,6 @@ def run_eval(dataset, iterations):
                                                                      cons_params, loss_function, EPS,
                                                                      dataset + suffixes[proc], mutex[proc],
                                                                      sensitive_attrs)))
-                elif proc > 0:
-                    threads.append(Process(target=train_classifier, args=( X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc], proc, 200, 1)))
 
     for process in threads:
         process.start()
@@ -156,7 +153,7 @@ def run_eval(dataset, iterations):
         process.join()
 
     threads = []
-
+    # print "elapsed time for k-fold iteration = " + str(time.time() - start)
     print "elapsed time = " + str(time.time() - start)
 
     results = []
@@ -168,6 +165,7 @@ def run_eval(dataset, iterations):
 
     plot_my_results(results, suffixes, "Images/" + dataset, dataset)
     delete_temp_files(dataset, suffixes)
+
 
 def train_zafar(x_train, y_train, x_control_train, x_test, y_test, x_control_test, cons_params, loss_function, EPS, dataset, mutex, sensitive_attrs):
 
@@ -181,7 +179,7 @@ def train_zafar(x_train, y_train, x_control_train, x_test, y_test, x_control_tes
             print "Solved !!!"
             break
         except Exception, e:
-            if cnt % 3 == 0:
+            if cnt % 4 == 0:
                 cons_params['tau'] *= 1.10
             print str(e) + ", tau = " + str(cons_params['tau'])
             cnt += 1
@@ -195,7 +193,8 @@ def train_zafar(x_train, y_train, x_control_train, x_test, y_test, x_control_tes
     results["TPR_non_protected"] = rates["TPR_Non_Protected"]
     results["TNR_protected"] = rates["TNR_Protected"]
     results["TNR_non_protected"] = rates["TNR_Non_Protected"]
-    results["fairness"] = abs(rates["TPR_Protected"] - rates["TPR_Non_Protected"]) + abs(rates["TNR_Protected"] - rates["TNR_Non_Protected"])
+    results["fairness"] = abs(rates["TPR_Protected"] - rates["TPR_Non_Protected"]) + abs(
+        rates["TNR_Protected"] - rates["TNR_Non_Protected"])
 
     mutex.acquire()
     infile = open(dataset, 'rb')
@@ -210,10 +209,8 @@ def train_zafar(x_train, y_train, x_control_train, x_test, y_test, x_control_tes
 
 def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, mode, base_learners, c):
     if mode == 1:
-        classifier = AdaCostClassifier(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB2")
+        classifier = AdaCostClassifier(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB1")
     elif mode == 2:
-        classifier = AccumFairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB1", c=c)
-    elif mode == 3:
         classifier = AccumFairAdaCost( n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2", c=c)
 
     classifier.fit(X_train, y_train)
@@ -232,9 +229,11 @@ def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, datase
     outfile.close()
     mutex.release()
 
+
 def main(dataset, iterations=5):
     run_eval(dataset,iterations)
 
+
 if __name__ == '__main__':
     # main(sys.argv[1], int(sys.argv[2]))
-    main("compass-gender",5)
+    main("kdd", 1)

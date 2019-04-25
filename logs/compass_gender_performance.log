@@ -1,0 +1,36 @@
+Counter({'Male': 4247, 'Female': 1031})
+
+Number of people recidivating within two years
+-1    2795
+ 1    2483
+dtype: int64
+
+
+Features we will be using for classification are: ['age_cat_25 - 45', 'age_cat_Greater than 45', 'age_cat_Less than 25', 'race', 'sex', 'priors_count', 'c_charge_degree', 'target'] 
+
+/home/iosifidis/.local/lib/python2.7/site-packages/numpy/core/fromnumeric.py:3118: RuntimeWarning: Mean of empty slice.
+  out=out, **kwargs)
+/home/iosifidis/.local/lib/python2.7/site-packages/numpy/core/_methods.py:85: RuntimeWarning: invalid value encountered in double_scalars
+  ret = ret.dtype.type(ret / rcount)
+/home/iosifidis/.local/lib/python2.7/site-packages/numpy/core/_methods.py:140: RuntimeWarning: Degrees of freedom <= 0 for slice
+  keepdims=keepdims)
+/home/iosifidis/.local/lib/python2.7/site-packages/numpy/core/_methods.py:110: RuntimeWarning: invalid value encountered in true_divide
+  arrmean, rcount, out=arrmean, casting='unsafe', subok=False)
+/home/iosifidis/.local/lib/python2.7/site-packages/numpy/core/_methods.py:132: RuntimeWarning: invalid value encountered in double_scalars
+  ret = ret.dtype.type(ret / rcount)
+elapsed time = 35.3249299526
+['Zafar et al.', 'Adaboost', 'AdaFair']
+accuracy [nan, 0.6634331186055323, 0.6471011746873817]
+accuracy dev [nan, 0.009076653230211356, 0.010058541475509046]
+balanced_accuracy [nan, 0.6620247096960277, 0.6484895403995845]
+balanced_accuracy dev [nan, 0.009614332761700812, 0.010590688808439599]
+fairness [nan, 0.4373076743452824, 0.09585297124919122]
+fairness_dev [nan, 0.14958034232594025, 0.04884080856131111]
+tpr_protected_list [nan, 0.4245892277081075, 0.6572829085337403]
+std_tpr_protected_list [nan, 0.07070095833895539, 0.05791197802164469]
+tpr_non_protected_list [nan, 0.6731220117881824, 0.6752843725680442]
+std_tpr_non_protected_list [nan, 0.039548826605727415, 0.04368189837232379]
+tnr_protected_list [nan, 0.8325672518639056, 0.609976662298747]
+std_tnr_protected_list [nan, 0.03768092029690781, 0.026195060721348848]
+tnr_non_protected_list [nan, 0.643792361598698, 0.6287905168456029]
+std_tnr_non_protected_list [nan, 0.032734661046381446, 0.035784865203540205]

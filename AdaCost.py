@@ -146,6 +146,14 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         #     print  "iteration, alpha , positives , negatives , dp , fp , dn , fn"
 
         old_weights_sum = np.sum(sample_weight)
+        pos, neg, dp, fp, dn, fn = self.calculate_weights(X, y, sample_weight)
+
+        if self.debug:
+            self.weight_list.append(
+                'init' + "," + str(0) + "," + str(pos) + ", " + str(neg) + ", " + str(dp) + ", " + str(
+                    fp) + ", " + str(dn) + ", " + str(fn))
+
+
         # print "training error, training balanced accuracy, training EQ.Odds, testing error, testing balanced accuracy, testing EQ.Odds"
         for iboost in range(self.n_estimators):
             # Boosting step
@@ -180,7 +188,6 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
 
             if self.debug:
                 self.weight_list.append(str(iboost) + "," + str(alpha) + "," + str(pos) + ", " + str(neg) + ", " + str(dp) + ", " + str(fp) + ", " + str(dn) + ", " + str(fn))
-                # print str(iboost) + "," + str(alpha) + "," + str(pos) + ", " + str(neg) + ", " + str(dp) + ", " + str(fp) + ", " + str(dn) + ", " + str(fn)
 
             self.W_pos += pos/self.n_estimators
             self.W_neg += neg/self.n_estimators
@@ -579,7 +586,12 @@ class AdaCostClassifier(BaseWeightBoosting, ClassifierMixin):
         return self.performance
 
     def get_weights_over_iterations(self):
-        return self.weight_list
+        return self.weight_list[-1]
+
+    def get_initial_weights(self):
+        return self.weight_list[0]
+
+
 
     def predict(self, X):
         """Predict classes for X.

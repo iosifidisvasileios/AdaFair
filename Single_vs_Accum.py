@@ -72,7 +72,7 @@ def predict(clf, X_test, y_test, sa_index, p_Group):
 
 
 def run_eval(dataset, iterations):
-    suffixes = ['AFB_CSB1 C = 0 ', 'AFB_CSB2 C = 0', 'AFB_CSB1 C = 1', 'AFB_CSB2 C = 1' ]
+    suffixes = ['NC AdaFair', 'AdaFair' ]
     create_temp_files(dataset, suffixes)
 
     if dataset == "compass-gender":
@@ -97,7 +97,7 @@ def run_eval(dataset, iterations):
 
     threads = []
     mutex = []
-    for lock in range(0, 4):
+    for lock in range(0, 2):
         mutex.append(Lock())
 
     random.seed(int(time.time()))
@@ -118,12 +118,9 @@ def run_eval(dataset, iterations):
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
 
-            for proc in range(0, 4):
-                if proc == 0 or proc == 1:
-                    c = 0
-                else:
-                    c = 1
-                threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc], proc, 200, c)))
+            for proc in range(0, 2):
+
+                threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc], proc, 100, 1)))
 
     for process in threads:
         process.start()
@@ -142,15 +139,15 @@ def run_eval(dataset, iterations):
         results.append(temp_buffer.performance)
         infile.close()
 
-    plot_my_results(results, suffixes, "Images/" + dataset + "_c_impact", dataset)
+    plot_my_results(results, suffixes, "Images/" + dataset + "_single_vs_accum", dataset)
     delete_temp_files(dataset, suffixes)
 
 def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, mode, base_learners, c):
 
-    if mode == 0 or mode == 2:
-        classifier = AccumFairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB1", c=c)
-    elif mode == 1 or mode == 3:
-        classifier = AccumFairAdaCost( n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2", c=c)
+    if mode == 0:
+        classifier = FairAdaCost( n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2")
+    elif mode == 1:
+        classifier = AccumFairAdaCost( n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2")
 
     classifier.fit(X_train, y_train)
 
@@ -172,5 +169,5 @@ def main(dataset, iterations=5):
     run_eval(dataset,iterations)
 
 if __name__ == '__main__':
-    main(sys.argv[1], int(sys.argv[2]))
+    main(sys.argv[1], 10)
     # main("compass-gender",5)

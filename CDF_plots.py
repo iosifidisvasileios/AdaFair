@@ -49,6 +49,8 @@ def run_eval(dataset):
 
     if dataset == "compass-gender":
         X, y, sa_index, p_Group, x_control = load_compas("sex")
+    elif dataset == "compass-race":
+        X, y, sa_index, p_Group, x_control = load_compas("race")
     elif dataset == "adult-gender":
         X, y, sa_index, p_Group, x_control = load_adult("sex")
     elif dataset == "bank":
@@ -58,25 +60,25 @@ def run_eval(dataset):
     else:
         exit(1)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=int(time.time()))
+    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.00005, random_state=int(time.time()))
 
     base_learners = 100
-    adaboost, adaboost_weights = train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, 0, base_learners )
-    csb1, csb1_weights = train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, 1, base_learners )
-    csb2, csb2_weights = train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, 2, base_learners )
+    adaboost, adaboost_weights, init_weights = train_classifier(X, None, y, None, sa_index, p_Group, 0, base_learners )
+    csb1, csb1_weights, temp= train_classifier(X, None, y, None, sa_index, p_Group, 1, base_learners )
+    csb2, csb2_weights, temp = train_classifier(X, None, y, None, sa_index, p_Group, 2, base_learners )
 
-    adaboost *= y_train
-    csb1 *= y_train
-    csb2 *= y_train
+    adaboost *= y
+    csb1 *= y
+    csb2 *= y
 
-    csb1_positives = csb1[y_train==1]
-    csb1_negatives = csb1[y_train==-1]
+    csb1_positives = csb1[y==1]
+    csb1_negatives = csb1[y==-1]
 
-    csb2_positives = csb2[y_train==1]
-    csb2_negatives = csb2[y_train==-1]
+    csb2_positives = csb2[y==1]
+    csb2_negatives = csb2[y==-1]
 
-    adaboost_positives = adaboost[y_train==1]
-    adaboost_negatives = adaboost[y_train==-1]
+    adaboost_positives = adaboost[y==1]
+    adaboost_negatives = adaboost[y==-1]
 
 
     num_bins = 50
@@ -87,15 +89,15 @@ def run_eval(dataset):
     ax1.grid(True)
     counts_ada_positives, bin_edges_ada_positives = numpy.histogram(adaboost_positives, bins=num_bins, normed=True)
     cdf_ada_positives = numpy.cumsum(counts_ada_positives)
-    ax1.plot(bin_edges_ada_positives[1:], cdf_ada_positives/ cdf_ada_positives[-1], c='blue', label= 'Adaboost')
+    ax1.plot(bin_edges_ada_positives[1:], cdf_ada_positives/ cdf_ada_positives[-1], c='blue', label= 'AdaBoost')
 
     counts_csb1_positives, bin_edges_csb1_positives = numpy.histogram(csb1_positives, bins=num_bins, normed=True)
     cdf_csb1_positives = numpy.cumsum(counts_csb1_positives)
-    ax1.plot(bin_edges_csb1_positives[1:], cdf_csb1_positives / cdf_csb1_positives[-1], c='green', linestyle='-.',label='AFB CSB1')
+    ax1.plot(bin_edges_csb1_positives[1:], cdf_csb1_positives / cdf_csb1_positives[-1], c='green', linestyle='-.',label='AdaFair NoConf.')
 
     counts_csb2_positives, bin_edges_csb2_positives = numpy.histogram(csb2_positives, bins=num_bins, normed=True)
     cdf_csb2_positives = numpy.cumsum(counts_csb2_positives)
-    ax1.plot(bin_edges_csb2_positives[1:], cdf_csb2_positives / cdf_csb2_positives[-1], c='red', linestyle='--', label='AFB CSB2')
+    ax1.plot(bin_edges_csb2_positives[1:], cdf_csb2_positives / cdf_csb2_positives[-1], c='red', linestyle='--', label='AdaFair')
     ax1.legend(loc='best')
     ax1.set_xlabel("Margin")
 
@@ -114,37 +116,58 @@ def run_eval(dataset):
     counts_ada_negatives, bin_edges_ada_negatives = numpy.histogram(adaboost_negatives, bins=num_bins, normed=True)
     cdf_ada_negatives = numpy.cumsum(counts_ada_negatives)
     ax2.plot(bin_edges_ada_negatives[1:], cdf_ada_negatives / cdf_ada_negatives[-1], c='blue',
-            label='Adaboost')
+            label='AdaBoost')
     ax2.set_ylabel("Cumulative Distribution")
     ax2.set_xlabel("Margin")
 
     counts_csb1_negatives, bin_edges_csb1_negatives = numpy.histogram(csb1_negatives, bins=num_bins, normed=True)
     cdf_csb1_negatives = numpy.cumsum(counts_csb1_negatives)
-    ax2.plot(bin_edges_csb1_negatives[1:], cdf_csb1_negatives/ cdf_csb1_negatives[-1], c='green', linestyle='-.',label='AFB CSB1')
-
+    ax2.plot(bin_edges_csb1_negatives[1:], cdf_csb1_negatives/ cdf_csb1_negatives[-1], c='green', linestyle='-.',label='AdaFair NoConf.')
     counts_csb2_negatives, bin_edges_csb2_negatives = numpy.histogram(csb2_negatives, bins=num_bins, normed=True)
     cdf_csb2_negatives= numpy.cumsum(counts_csb2_negatives)
-    ax2.plot(bin_edges_csb2_negatives[1:], cdf_csb2_negatives/ cdf_csb2_negatives[-1], c='red', linestyle='--', label='AFB CSB2')
+    ax2.plot(bin_edges_csb2_negatives[1:], cdf_csb2_negatives/ cdf_csb2_negatives[-1], c='red', linestyle='--', label='AdaFair')
     ax2.legend(loc='best')
 
 
 
-    index = numpy.arange(3)
+    index = numpy.arange(4)
     bar_width = 0.2
 
+    adaboost_weights = adaboost_weights.split(",")
+    init_weights = init_weights.split(",")
+    csb1_weights = csb1_weights.split(",")
+    csb2_weights = csb2_weights.split(",")
 
     ax3.set_title("Average Weights per class")
     ax3.set_ylabel("(%)")
 
-    ax3.bar(index, [adaboost_weights[0], csb1_weights[0], csb2_weights[0]],label='Positive Class', edgecolor='black', width= bar_width)
-    ax3.bar(index+ bar_width, [adaboost_weights[1], csb1_weights[1], csb2_weights[1]],label='Negative Class',  edgecolor='black', width= bar_width)
 
-    ax3.set_xticks([0, 1, 2])
+    # ax3.bar(index, [init_weights[4], adaboost_weights[4], csb1_weights[4], csb2_weights[4]],label='Prot. Pos.', edgecolor='black', width= bar_width)
+    # ax3.bar(index+ bar_width, [init_weights[5], adaboost_weights[5], csb1_weights[5], csb2_weights[5]],label='Non-Prot. Pos.',  edgecolor='red', width= bar_width)
+    # ax3.bar(index+ 2*bar_width, [init_weights[6], adaboost_weights[6], csb1_weights[6], csb2_weights[6]],label='Prot. Neg.',  edgecolor='green', width= bar_width)
+    # ax3.bar(index+ 3*bar_width, [init_weights[7], adaboost_weights[7], csb1_weights[7], csb2_weights[7]],label='Non-Prot. Neg.',  edgecolor='blue', width= bar_width)
+
+    prot_pos = [float(init_weights[4]), float(adaboost_weights[4]), float(csb1_weights[4]), float(csb2_weights[4])]
+    non_prot_pos = [float(init_weights[5]), float(adaboost_weights[5]), float(csb1_weights[5]), float(csb2_weights[5])]
+    prot_neg = [float(init_weights[6]), float(adaboost_weights[6]), float(csb1_weights[6]), float(csb2_weights[6])]
+    non_prot_neg = [float(init_weights[7]), float(adaboost_weights[7]), float(csb1_weights[7]), float(csb2_weights[7])]
+
+    ax3.bar(index, prot_pos,label='Prot. Pos.', edgecolor='black', width= bar_width)
+    ax3.bar(index, non_prot_pos,label='Non-Prot. Pos.', bottom=prot_pos, edgecolor='red', width= bar_width)
+    ax3.bar(index, prot_neg,label='Prot. Neg.', bottom=[i+j for i,j in zip(prot_pos, non_prot_pos)],  edgecolor='green', width= bar_width)
+    ax3.bar(index, non_prot_neg,label='Non-Prot. Neg.', bottom=[i+j+z for i,j,z in zip(prot_pos, non_prot_pos, prot_neg)],  edgecolor='blue', width= bar_width)
+
+
+
+
+
+
+    ax3.set_xticks([0  , 1 , 2 , 3 ])
     ax3.grid(True)
 
-    ax3.set_xticklabels(['Adaboost', 'AFB CSB1', 'AFB CSB2'])
+    ax3.set_xticklabels(['Initial Weights','AdaBoost', 'AdaFair NoConf.', 'AdaFair'])
     ax3.legend(loc='best')
-    ax3.set_ylim([0.48, 0.52])
+    # ax3.set_ylim([0.48, 0.52])
 
     fig.tight_layout()
 
@@ -156,15 +179,15 @@ def run_eval(dataset):
 
 def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, mode, base_learners):
     if mode == 0:
-        classifier = AdaCostClassifier(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB2", debug=True)
+        classifier = AdaCostClassifier(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB1", debug=True)
     elif mode == 1:
         classifier = AccumFairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB1", debug=True,c=1)
     elif mode == 2:
         classifier = AccumFairAdaCost( n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2", debug=True, c=1)
 
     classifier.fit(X_train, y_train)
-
-    return classifier.conf_scores, classifier.get_weights()
+    print classifier.get_weights_over_iterations()
+    return classifier.conf_scores, classifier.get_weights_over_iterations(), classifier.get_initial_weights()
 
 
 def main(dataset):
@@ -172,4 +195,4 @@ def main(dataset):
 
 
 if __name__ == '__main__':
-    main("kdd")
+    main("bank")
