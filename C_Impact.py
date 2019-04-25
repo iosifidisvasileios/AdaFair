@@ -1,47 +1,31 @@
-import random
-from collections import defaultdict
 from multiprocessing import Process, Lock
 import pickle
 import os
 import matplotlib
 import numpy
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import ShuffleSplit
-from sklearn.naive_bayes import GaussianNB
 
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 
 import sys
-import pandas as pd
 
-from sklearn.calibration import CalibratedClassifierCV, calibration_curve
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
-from sklearn.tree import DecisionTreeClassifier
 
 from AccumFairAdaCost import AccumFairAdaCost
 
 sys.path.insert(0, 'DataPreprocessing')
 sys.path.insert(0, 'equalized_odds_and_calibration-master')
 
-from eq_odds import Model
-from call_eq_odds import Model as calibModel
-import funcs_disp_mist as fdm
+# import funcs_disp_mist as fdm
 
 import time
-from sklearn.model_selection import StratifiedKFold
 from AdaCost import AdaCostClassifier
-from FairAdaCost import FairAdaCost
 from load_kdd import load_kdd
 from load_dutch_data import load_dutch_data
 # from load_german import load_german
 from load_compas_data import load_compas
 from load_adult import load_adult
 from load_bank import load_bank
-from my_useful_functions import calculate_performance, plot_my_results, plot_results_of_c_impact
-import utils as ut
+from my_useful_functions import calculate_performance, plot_results_of_c_impact
 
 
 class serialazible_list():
@@ -103,8 +87,8 @@ def run_eval(dataset):
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=int(time.time()))
         for c in steps:
 
-            threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[0], mutex[0], 1, base_learners,c)))
-            threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[1], mutex[1], 2, base_learners,c)))
+            # threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[0], mutex[0], 1, base_learners,c)))
+            threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[1], mutex[1], 2, base_learners, c)))
 
         for process in threads:
             process.start()
@@ -156,3 +140,6 @@ def main(dataset):
 if __name__ == '__main__':
     # main(sys.argv[1])
     main("compass-gender")
+    main("adult-gender")
+    main("bank")
+    main("kdd")
