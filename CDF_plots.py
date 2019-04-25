@@ -1,24 +1,16 @@
 import random
 from collections import defaultdict
-from multiprocessing import Process, Lock
-import pickle
-import os
 import matplotlib
 import numpy
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import ShuffleSplit
 from sklearn.naive_bayes import GaussianNB
 
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 import sys
-import pandas as pd
 
-from sklearn.calibration import CalibratedClassifierCV, calibration_curve
 from sklearn.ensemble import AdaBoostClassifier
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
 
 from AccumFairAdaCost import AccumFairAdaCost
@@ -26,23 +18,16 @@ from AccumFairAdaCost import AccumFairAdaCost
 sys.path.insert(0, 'DataPreprocessing')
 sys.path.insert(0, 'equalized_odds_and_calibration-master')
 
-from eq_odds import Model
-from call_eq_odds import Model as calibModel
-import funcs_disp_mist as fdm
+# import funcs_disp_mist as fdm
 
 import time
-from sklearn.model_selection import StratifiedKFold
 from AdaCost import AdaCostClassifier
 from FairAdaCost import FairAdaCost
 from load_kdd import load_kdd
-from load_dutch_data import load_dutch_data
 # from load_german import load_german
 from load_compas_data import load_compas
 from load_adult import load_adult
 from load_bank import load_bank
-from my_useful_functions import calculate_performance, plot_my_results
-import utils as ut
-
 
 
 def run_eval(dataset):
@@ -62,10 +47,10 @@ def run_eval(dataset):
 
     # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.00005, random_state=int(time.time()))
 
-    base_learners = 100
-    adaboost, adaboost_weights, init_weights = train_classifier(X, None, y, None, sa_index, p_Group, 0, base_learners )
-    csb1, csb1_weights, temp= train_classifier(X, None, y, None, sa_index, p_Group, 1, base_learners )
-    csb2, csb2_weights, temp = train_classifier(X, None, y, None, sa_index, p_Group, 2, base_learners )
+    base_learners = 200
+    adaboost, adaboost_weights, init_weights = train_classifier(X,  y, sa_index, p_Group, 0, base_learners )
+    csb1, csb1_weights, temp= train_classifier(X, y, sa_index, p_Group, 1, base_learners )
+    csb2, csb2_weights, temp = train_classifier(X, y, sa_index, p_Group, 2, base_learners )
 
     adaboost *= y
     csb1 *= y
@@ -82,7 +67,7 @@ def run_eval(dataset):
 
 
     num_bins = 50
-    fig, (ax1, ax2, ax3) = plt.subplots(nrows=1, ncols=3, figsize=(18,4))
+    fig, (ax1, ax2, ax3) = plt.subplots(nrows=1, ncols=3, figsize=(14,3))
 
 
     ax1.set_title( "Positive CDF")
@@ -138,14 +123,9 @@ def run_eval(dataset):
     csb1_weights = csb1_weights.split(",")
     csb2_weights = csb2_weights.split(",")
 
-    ax3.set_title("Average Weights per class")
+    ax3.set_title("Average Weights")
     ax3.set_ylabel("(%)")
 
-
-    # ax3.bar(index, [init_weights[4], adaboost_weights[4], csb1_weights[4], csb2_weights[4]],label='Prot. Pos.', edgecolor='black', width= bar_width)
-    # ax3.bar(index+ bar_width, [init_weights[5], adaboost_weights[5], csb1_weights[5], csb2_weights[5]],label='Non-Prot. Pos.',  edgecolor='red', width= bar_width)
-    # ax3.bar(index+ 2*bar_width, [init_weights[6], adaboost_weights[6], csb1_weights[6], csb2_weights[6]],label='Prot. Neg.',  edgecolor='green', width= bar_width)
-    # ax3.bar(index+ 3*bar_width, [init_weights[7], adaboost_weights[7], csb1_weights[7], csb2_weights[7]],label='Non-Prot. Neg.',  edgecolor='blue', width= bar_width)
 
     prot_pos = [float(init_weights[4]), float(adaboost_weights[4]), float(csb1_weights[4]), float(csb2_weights[4])]
     non_prot_pos = [float(init_weights[5]), float(adaboost_weights[5]), float(csb1_weights[5]), float(csb2_weights[5])]
@@ -159,15 +139,15 @@ def run_eval(dataset):
 
 
 
-
-
-
     ax3.set_xticks([0  , 1 , 2 , 3 ])
     ax3.grid(True)
 
     ax3.set_xticklabels(['Initial Weights','AdaBoost', 'AdaFair NoConf.', 'AdaFair'])
-    ax3.legend(loc='best')
+    ax3.legend(loc='best',framealpha=0.0)
+    plt.yticks(numpy.arange(0, 1.0001, step=0.1))
+
     # ax3.set_ylim([0.48, 0.52])
+    plt.rcParams.update({'font.size': 9})
 
     fig.tight_layout()
 
@@ -177,7 +157,7 @@ def run_eval(dataset):
     plt.legend(loc='best')
     plt.savefig("Images/cdf_" +dataset  + ".png")
 
-def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, mode, base_learners):
+def train_classifier(X_train, y_train, sa_index, p_Group, mode, base_learners):
     if mode == 0:
         classifier = AdaCostClassifier(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB1", debug=True)
     elif mode == 1:
@@ -186,7 +166,7 @@ def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, mode, 
         classifier = AccumFairAdaCost( n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2", debug=True, c=1)
 
     classifier.fit(X_train, y_train)
-    print classifier.get_weights_over_iterations()
+
     return classifier.conf_scores, classifier.get_weights_over_iterations(), classifier.get_initial_weights()
 
 
@@ -195,4 +175,7 @@ def main(dataset):
 
 
 if __name__ == '__main__':
+    # main("compass-gender")
+    main("adult-gender")
     main("bank")
+    main("kdd")

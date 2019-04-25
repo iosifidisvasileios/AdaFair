@@ -1,23 +1,16 @@
 import random
-from collections import defaultdict
 from multiprocessing import Process, Lock
 import pickle
 import os
 import matplotlib
-import numpy
-from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import ShuffleSplit
-from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.naive_bayes import GaussianNB
 
 matplotlib.use('Agg')
 import sys
 import pandas as pd
 
-from sklearn.calibration import CalibratedClassifierCV, calibration_curve
-from sklearn.ensemble import AdaBoostClassifier
 from sklearn.metrics import accuracy_score
-from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
 
 from AccumFairAdaCost import AccumFairAdaCost
@@ -25,12 +18,9 @@ from AccumFairAdaCost import AccumFairAdaCost
 sys.path.insert(0, 'DataPreprocessing')
 sys.path.insert(0, 'equalized_odds_and_calibration-master')
 
-from eq_odds import Model
 from call_eq_odds import Model as calibModel
-import funcs_disp_mist as fdm
 
 import time
-from sklearn.model_selection import StratifiedKFold
 from AdaCost import AdaCostClassifier
 from FairAdaCost import FairAdaCost
 
@@ -42,7 +32,6 @@ from load_kdd import load_kdd
 
 from load_bank import load_bank
 from my_useful_functions import calculate_performance, plot_my_results
-import utils as ut
 
 
 class serialazible_list(object):
@@ -120,7 +109,7 @@ def run_eval(dataset, iterations):
 
             for proc in range(0, 2):
 
-                threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc], proc, 100, 1)))
+                threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc], proc, 200, 1)))
 
     for process in threads:
         process.start()
