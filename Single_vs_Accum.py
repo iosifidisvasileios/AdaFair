@@ -53,15 +53,8 @@ def delete_temp_files(dataset, suffixes):
     for suffix in suffixes:
         os.remove(dataset + suffix)
 
-
-def predict(clf, X_test, y_test, sa_index, p_Group):
-    y_pred_probs = clf.predict_proba(X_test)[:, 1]
-    y_pred_labels = clf.predict(X_test)
-    return calculate_performance(X_test, y_test, y_pred_labels, y_pred_probs, sa_index, p_Group)
-
-
 def run_eval(dataset, iterations):
-    suffixes = ['NC AdaFair', 'AdaFair' ]
+    suffixes = ['NC AdaFair', 'AdaFair']
     create_temp_files(dataset, suffixes)
 
     if dataset == "compass-gender":
@@ -94,22 +87,16 @@ def run_eval(dataset, iterations):
     for iter in range(0, iterations):
         start = time.time()
 
-        temp_shuffle_array = [i for i in range(0, len(X))]
-        random.shuffle(temp_shuffle_array)
+        sss = ShuffleSplit(n_splits=2, test_size=0.5)
 
-        train1 = temp_shuffle_array[: int(len(X)/2)]
-        test1  = temp_shuffle_array[int(len(X)/2): ]
+        for train_index, test_index in sss.split(X, y):
 
-        train2 = temp_shuffle_array[int(len(X)/2):]
-        test2  = temp_shuffle_array[:int(len(X)/2)]
-
-        for train_index, test_index in [[train1, test1],[train2, test2]]:
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
 
             for proc in range(0, 2):
 
-                threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc], proc, 200, 1)))
+                threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc], proc, 200)))
 
     for process in threads:
         process.start()
@@ -131,12 +118,12 @@ def run_eval(dataset, iterations):
     plot_my_results(results, suffixes, "Images/" + dataset + "_single_vs_accum", dataset)
     delete_temp_files(dataset, suffixes)
 
-def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, mode, base_learners, c):
+def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, mode, base_learners):
 
     if mode == 0:
-        classifier = FairAdaCost( n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2")
+        classifier = FairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2")
     elif mode == 1:
-        classifier = AccumFairAdaCost( n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2")
+        classifier = AccumFairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2")
 
     classifier.fit(X_train, y_train)
 
@@ -147,8 +134,7 @@ def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, datase
     infile = open(dataset, 'rb')
     dict_to_ram = pickle.load(infile)
     infile.close()
-    dict_to_ram.performance.append(
-        calculate_performance(X_test, y_test, y_pred_labels, y_pred_probs, sa_index, p_Group))
+    dict_to_ram.performance.append(calculate_performance(X_test, y_test, y_pred_labels, y_pred_probs, sa_index, p_Group))
     outfile = open(dataset, 'wb')
     pickle.dump(dict_to_ram, outfile)
     outfile.close()
@@ -158,5 +144,5 @@ def main(dataset, iterations=5):
     run_eval(dataset,iterations)
 
 if __name__ == '__main__':
-    main(sys.argv[1], 10)
-    # main("compass-gender",5)
+    # main(sys.argv[1], 10)
+    main("kdd", 1)

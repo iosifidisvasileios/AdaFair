@@ -330,13 +330,13 @@ def plot_per_round(rounds, results, objective, output_dir ):
     plt.figure()
     plt.grid(True)
 
-    plt.plot(step_list, train_error_list, '--', label='Train Error')
+    plt.plot(step_list, train_error_list, '--', label='Error rate')
     # plt.plot(step_list, test_error_list, '-<', label='Test Error')
 
-    plt.plot(step_list, train_bal_error_list, '-.', label='Train Bal.Error')
+    plt.plot(step_list, train_bal_error_list, '-.', label='Bal.Error rate')
     # plt.plot(step_list, test_bal_error_list, '-x', label='Test Bal.Error')
 
-    plt.plot(step_list, train_fairness, '-', label='Train E.O.')
+    plt.plot(step_list, train_fairness, '-', label='E.O.')
     plt.plot(step_list, objective_list, ':', label='Objective')
     # plt.plot(step_list, test_fairness, '-o', label='Test E.O.')
 
