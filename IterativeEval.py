@@ -5,6 +5,7 @@ import pickle
 import os
 import matplotlib
 import numpy
+import time
 from sklearn.model_selection import ShuffleSplit
 
 matplotlib.use('Agg')
@@ -73,12 +74,19 @@ def run_eval(dataset):
         exit(1)
 
     base_learners = 200
-    random.seed(12345)
+    random.seed(int(time.time()))
 
-    classifier = AccumFairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2", c=1,
-                                  debug=True)
-    classifier.fit(X, y)
-    plot_per_round(base_learners, classifier.performance, classifier.objective, "Images/Round_" + dataset + ".png")
+    sss = ShuffleSplit(n_splits=2, test_size=0.5)
+
+    for train_index, test_index in sss.split(X, y):
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
+
+
+        classifier = AccumFairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2", c=1,
+                                      debug=True, X_test=X_test, y_test=y_test)
+        classifier.fit(X_train, y_train)
+        plot_per_round(base_learners, classifier.performance, classifier.objective, "Images/Round_" + dataset + ".png")
 
 
 def main(dataset):
@@ -86,7 +94,8 @@ def main(dataset):
 
 
 if __name__ == '__main__':
+
     # main("compass-gender")
-    # main("adult-gender")
+    main("adult-gender")
     # main("bank")
-    main("kdd")
+    # main("kdd")

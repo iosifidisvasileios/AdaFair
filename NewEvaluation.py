@@ -4,37 +4,25 @@ from multiprocessing import Process, Lock
 import pickle
 import os
 import matplotlib
-import numpy
-from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import ShuffleSplit
-from sklearn.naive_bayes import GaussianNB
+
+from SMOTEBoost import SMOTEBoost
 
 matplotlib.use('Agg')
 import sys
-import pandas as pd
-
-from sklearn.calibration import CalibratedClassifierCV, calibration_curve
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import train_test_split
-from sklearn.tree import DecisionTreeClassifier
 
 from AccumFairAdaCost import AccumFairAdaCost
 
 sys.path.insert(0, 'DataPreprocessing')
 sys.path.insert(0, 'equalized_odds_and_calibration-master')
 
-from eq_odds import Model
-from call_eq_odds import Model as calibModel
 import funcs_disp_mist as fdm
 
 import time
-from sklearn.model_selection import StratifiedKFold
+
 from AdaCost import AdaCostClassifier
-from FairAdaCost import FairAdaCost
 
 from load_dutch_data import load_dutch_data
-# from load_german import load_german
 from load_compas_data import load_compas
 from load_adult import load_adult
 from load_kdd import load_kdd
@@ -71,8 +59,7 @@ def predict(clf, X_test, y_test, sa_index, p_Group):
 
 
 def run_eval(dataset, iterations):
-    suffixes = ['Zafar et al.', 'Adaboost', 'AdaFair' ]
-    create_temp_files(dataset, suffixes)
+    suffixes = ['Zafar et al.', 'Adaboost', 'AdaFair', 'SMOTEBoost' ]
 
     if dataset == "compass-gender":
         X, y, sa_index, p_Group, x_control = load_compas("sex")
@@ -82,13 +69,10 @@ def run_eval(dataset, iterations):
         X, y, sa_index, p_Group, x_control = load_adult("sex")
     elif dataset == "adult-race":
         X, y, sa_index, p_Group, x_control = load_adult("race")
-    elif dataset == "dutch":
-        X, y, sa_index, p_Group, x_control = load_dutch_data()
     elif dataset == "bank":
         X, y, sa_index, p_Group, x_control = load_bank()
     elif dataset == "kdd":
         X, y, sa_index, p_Group, x_control = load_kdd()
-        suffixes = [None,'Adaboost', 'AdaFair']
 
     else:
         exit(1)
@@ -110,20 +94,19 @@ def run_eval(dataset, iterations):
     for lock in range(0, 8):
         mutex.append(Lock())
 
-    random.seed(12345)
+    random.seed(int(time.time()))
 
     for iter in range(0, iterations):
-        start = time.time()
 
         sss = ShuffleSplit(n_splits=1, test_size=0.5)
-
         for train_index, test_index in sss.split(X, y):
 
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
 
-            for proc in range(0, 3):
-                if proc == 0 :
+            for proc in range(0, 4):
+                if proc != 2 :
+                    time.sleep(1)
                     continue
 
                 if proc > 0:
@@ -153,8 +136,6 @@ def run_eval(dataset, iterations):
         process.join()
 
     threads = []
-    # print "elapsed time for k-fold iteration = " + str(time.time() - start)
-    print "elapsed time = " + str(time.time() - start)
 
     results = []
     for suffix in suffixes:
@@ -166,7 +147,6 @@ def run_eval(dataset, iterations):
     plot_my_results(results, suffixes, "Images/" + dataset, dataset)
     delete_temp_files(dataset, suffixes)
 
-
 def train_zafar(x_train, y_train, x_control_train, x_test, y_test, x_control_test, cons_params, loss_function, EPS, dataset, mutex, sensitive_attrs):
 
     cnt = 1
@@ -175,7 +155,7 @@ def train_zafar(x_train, y_train, x_control_train, x_test, y_test, x_control_tes
             return
         try:
             w = fdm.train_model_disp_mist(x_train, y_train, x_control_train, loss_function, EPS, cons_params)
-            rates, acc, balanced_acc = fdm.get_clf_stats(w, x_train, y_train, x_control_train, x_test, y_test, x_control_test, sensitive_attrs)
+            rates, acc, balanced_acc,_ = fdm.get_clf_stats(w, x_train, y_train, x_control_train, x_test, y_test, x_control_test, sensitive_attrs)
             print "Solved !!!"
             break
         except Exception, e:
@@ -193,8 +173,7 @@ def train_zafar(x_train, y_train, x_control_train, x_test, y_test, x_control_tes
     results["TPR_non_protected"] = rates["TPR_Non_Protected"]
     results["TNR_protected"] = rates["TNR_Protected"]
     results["TNR_non_protected"] = rates["TNR_Non_Protected"]
-    results["fairness"] = abs(rates["TPR_Protected"] - rates["TPR_Non_Protected"]) + abs(
-        rates["TNR_Protected"] - rates["TNR_Non_Protected"])
+    results["fairness"] = abs(rates["TPR_Protected"] - rates["TPR_Non_Protected"]) + abs(rates["TNR_Protected"] - rates["TNR_Non_Protected"])
 
     mutex.acquire()
     infile = open(dataset, 'rb')
@@ -212,7 +191,8 @@ def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, datase
         classifier = AdaCostClassifier(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB1")
     elif mode == 2:
         classifier = AccumFairAdaCost( n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2", c=c)
-
+    elif mode == 3:
+        classifier = SMOTEBoost(n_estimators=base_learners,saIndex=sa_index,n_samples=2, saValue=p_Group,  CSB="CSB1" )
     classifier.fit(X_train, y_train)
 
     y_pred_probs = classifier.predict_proba(X_test)[:, 1]
@@ -230,10 +210,10 @@ def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, datase
     mutex.release()
 
 
-def main(dataset, iterations=5):
-    run_eval(dataset,iterations)
-
-
 if __name__ == '__main__':
-    # main(sys.argv[1], int(sys.argv[2]))
-    main("kdd", 1)
+    # run_eval(sys.argv[1], int(sys.argv[2]))
+    # run_eval("compass-race", 5)
+    run_eval("compass-gender", 5)
+    # run_eval("adult-gender", 5)
+    # run_eval("bank", 5)
+    # run_eval("kdd", 1)

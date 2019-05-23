@@ -1,3 +1,5 @@
+# encoding: utf-8
+
 import matplotlib
 matplotlib.use('Agg')
 
@@ -149,7 +151,7 @@ def plot_results_of_c_impact(csb1, csb2, steps, output_dir, dataset):
 
     plt.figure(figsize=(5, 5))
     plt.grid(True)
-    plt.rcParams.update({'font.size': 12})
+    plt.rcParams.update({'font.size': 13})
 
     # plt.plot(steps, csb1_accuracy_list, '-.', label='AFB CSB1 Accuracy')
     plt.plot(steps, csb2_accuracy_list, '--', label='Accuracy')
@@ -164,14 +166,56 @@ def plot_results_of_c_impact(csb1, csb2, steps, output_dir, dataset):
     plt.plot(steps, csb2_tnr_protected_list, '-^', label='TNR Prot.')
     plt.plot(steps, csb2_tnr_non_protected_list, '-<', label='TNR Non-Prot.')
 
-    plt.legend(loc='best', shadow=False)
+    plt.legend(loc='center', bbox_to_anchor=(0.7, 0.3), shadow=False,ncol=1, framealpha=.30)
 
     plt.xlabel('c')
-    plt.ylabel('(%)')
+    # plt.ylabel('(%)')
     # plt.title("Impact of c for " + dataset + " dataset")
+
+    print "csb2_accuracy_list " + str(csb2_accuracy_list)
+    print "csb2_balanced_accuracy_list " + str(csb2_balanced_accuracy_list)
+    print "csb2_fairness_list " + str(csb2_fairness_list)
+    print "csb2_tpr_protected_list " + str(csb2_tpr_protected_list)
+    print "csb2_tpr_non_protected_list " + str(csb2_tpr_non_protected_list)
+    print "csb2_tnr_protected_list " + str(csb2_tnr_protected_list)
+    print "csb2_tnr_non_protected_list " + str(csb2_tnr_non_protected_list)
 
     plt.savefig(output_dir + dataset + "_c_impact.png", bbox_inches='tight', dpi=200)
 
+
+def plot_costs_per_round(output, noaccum, adafair):
+    noaccum_tpr = []
+    noaccum_tnr = []
+    accum_tpr = []
+    accum_tnr = []
+    for i in noaccum:
+        noaccum_tpr.append(float(i.split(",")[0]))
+        noaccum_tnr.append(float(i.split(",")[1]))
+    for i in adafair:
+        accum_tpr.append(float(i.split(",")[0]))
+        accum_tnr.append(float(i.split(",")[1]))
+
+    steps = numpy.arange(0, len(accum_tnr), step=1)
+    plt.figure(figsize=(5, 5))
+    plt.grid(True)
+    plt.rcParams.update({'font.size': 10.5})
+
+    plt.plot(steps, noaccum_tpr, '-.', label='AdaFair NoCumul ' + r'$\delta$FNR')
+    plt.plot(steps, noaccum_tnr, ':', label='AdaFair NoCumul ' + r'$\delta$FPR')
+    plt.plot(steps, accum_tpr, '-', label='AdaFair ' + r'$\delta$FNR')
+    plt.plot(steps, accum_tnr, '--', label='AdaFair ' + r'$\delta$FPR')
+
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.105), ncol=2, shadow=False,fancybox=True, framealpha=1.0)
+
+    # plt.legend(loc='best')
+
+    plt.xlabel('Round')
+
+    plt.savefig(output+ "_costs.png", bbox_inches='tight', dpi=200,shadow=False,fancybox=True, framealpha=.30)
+
+
+    print accum_tnr
+    pass
 
 def plot_results(init, max_cost, step, summary_performance, summary_weights, output_dir, title, plot_weights=True):
     step_list = []
@@ -330,24 +374,26 @@ def plot_per_round(rounds, results, objective, output_dir ):
     plt.figure()
     plt.grid(True)
 
-    plt.plot(step_list, train_error_list, '--', label='Error rate')
-    # plt.plot(step_list, test_error_list, '-<', label='Test Error')
+    plt.plot(step_list, train_error_list, '--', label='Train Error rate')
+    plt.plot(step_list, test_error_list, ':', label='Test Error rate')
 
-    plt.plot(step_list, train_bal_error_list, '-.', label='Bal.Error rate')
-    # plt.plot(step_list, test_bal_error_list, '-x', label='Test Bal.Error')
+    plt.plot(step_list, train_bal_error_list, '-.', label='Train Bal.Error rate')
+    plt.plot(step_list, test_bal_error_list, '-', label='Test Bal.Error rate')
 
-    plt.plot(step_list, train_fairness, '-', label='E.O.')
-    plt.plot(step_list, objective_list, ':', label='Objective')
-    # plt.plot(step_list, test_fairness, '-o', label='Test E.O.')
+    plt.plot(step_list, train_fairness, '-x', label='Train E.O.', markersize=3.25)
+    plt.plot(step_list, objective_list, '-<', label='Objective', markersize=3.25)
+    plt.plot(step_list, test_fairness, '-o', label='Test E.O.', markersize=3.25)
 
     # plt.figure(figsize=(10, 10))
-    plt.rcParams.update({'font.size': 12})
+    plt.rcParams.update({'font.size': 10})
     # plt.ylim([0,1])
     # plt.yticks(numpy.arange(0, 1.00001, step=0.05))
 
     plt.xlabel('Rounds')
     plt.ylabel('(%)')
-    plt.legend(loc='best',ncol=1, shadow=False)
+    # plt.legend(loc='best',ncol=1, shadow=False)
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.21), ncol=3, shadow=False,fancybox=True, framealpha=1.0)
+
     # plt.title("Performance for " + dataset)
     plt.savefig(output_dir,bbox_inches='tight', dpi=200)
 

@@ -1,8 +1,10 @@
+import random
 from multiprocessing import Process, Lock
 import pickle
 import os
 import matplotlib
 import numpy
+from sklearn.model_selection import ShuffleSplit
 
 matplotlib.use('Agg')
 
@@ -51,7 +53,7 @@ def delete_temp_files(dataset, suffixes):
 
 
 
-def run_eval(dataset):
+def run_eval(dataset, iterations):
 
     if dataset == "compass-gender":
         X, y, sa_index, p_Group, x_control = load_compas("sex")
@@ -71,6 +73,7 @@ def run_eval(dataset):
         exit(1)
 
     suffixes = ['AdaFair NoConf.', 'AdaFair']
+    random.seed(int(time.time()))
 
     base_learners = 200
     steps = numpy.arange(0, 1.001, step=0.2)
@@ -81,14 +84,17 @@ def run_eval(dataset):
     for lock in range(0, 2):
         mutex.append(Lock())
 
-    for iterations in range (0,5):
+    for iterations in range (0,iterations):
         start = time.time()
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=int(time.time()))
-        for c in steps:
+        sss = ShuffleSplit(n_splits=2, test_size=0.5)
+        for train_index, test_index in sss.split(X, y):
 
-            # threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[0], mutex[0], 1, base_learners,c)))
-            threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[1], mutex[1], 2, base_learners, c)))
+            X_train, X_test = X[train_index], X[test_index]
+            y_train, y_test = y[train_index], y[test_index]
+
+            for c in steps:
+                threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[1], mutex[1], 2, base_learners, c)))
 
         for process in threads:
             process.start()
@@ -133,13 +139,15 @@ def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, datase
     mutex.release()
 
 
-def main(dataset):
-    run_eval(dataset)
+def main(dataset, iterations):
+    run_eval(dataset, iterations)
 
 
 if __name__ == '__main__':
     # main(sys.argv[1])
-    main("compass-gender")
-    main("adult-gender")
-    main("bank")
-    main("kdd")
+    # main("compass-gender",10)
+    # main("adult-gender", 2)
+    # main("bank", 2)
+    main("kdd", 1)
+
+

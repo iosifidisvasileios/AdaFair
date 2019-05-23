@@ -154,6 +154,17 @@ def getRRBRate(w, x_train, y_train, x_control_train, x_test, y_test, x_control_t
     return float(100*(1-accuracy))
 
 
+def get_predictions(w, x_train, x_control_train, x_test, x_control_test, sensitive_attrs):
+    s_attr = sensitive_attrs[0]  # for now, lets compute the accuracy for just one sensitive attr
+
+    # compute distance from boundary
+    distances_boundary_train = get_distance_boundary(w, x_train, x_control_train[s_attr])
+    distances_boundary_test = get_distance_boundary(w, x_test, x_control_test[s_attr])
+
+    # compute the class labels
+
+    return np.sign(distances_boundary_test)
+
 
 
 
@@ -195,7 +206,7 @@ def get_clf_stats(w, x_train, y_train, x_control_train, x_test, y_test, x_contro
         # print "\n"
 
     # return train_score, test_score, cov_all_train, cov_all_test, s_attr_to_fp_fn_train, s_attr_to_fp_fn_test
-    return rates, accuracy, balanced_acc
+    return rates, accuracy, balanced_acc,all_class_labels_assigned_test
 
 def get_distance_boundary(w, x, s_attr_arr):
 

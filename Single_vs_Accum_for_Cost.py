@@ -23,7 +23,7 @@ from load_adult import load_adult
 from load_kdd import load_kdd
 
 from load_bank import load_bank
-from my_useful_functions import calculate_performance, plot_my_results
+from my_useful_functions import calculate_performance, plot_my_results, plot_costs_per_round
 
 
 class serialazible_list(object):
@@ -45,9 +45,9 @@ def delete_temp_files(dataset, suffixes):
     for suffix in suffixes:
         os.remove(dataset + suffix)
 
-def run_eval(dataset, iterations):
-    suffixes = ['NC AdaFair', 'AdaFair']
-    create_temp_files(dataset, suffixes)
+def run_eval(dataset):
+
+
 
     if dataset == "compass-gender":
         X, y, sa_index, p_Group, x_control = load_compas("sex")
@@ -65,57 +65,28 @@ def run_eval(dataset, iterations):
         X, y, sa_index, p_Group, x_control = load_kdd()
     else:
         exit(1)
-    create_temp_files(dataset, suffixes)
-
-
-
-    threads = []
-    mutex = []
-    for lock in range(0, 2):
-        mutex.append(Lock())
 
     random.seed(int(time.time()))
+    sss = ShuffleSplit(n_splits=1, test_size=0.5)
 
-    for iter in range(0, iterations):
-        start = time.time()
+    for train_index, test_index in sss.split(X, y):
 
-        sss = ShuffleSplit(n_splits=2, test_size=0.5)
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
+        adafairnoaccum= FairAdaCost(n_estimators=200, saIndex=sa_index, saValue=p_Group,   CSB="CSB2")
+        adafairnoaccum.fit(X_train, y_train)
 
-        for train_index, test_index in sss.split(X, y):
+        adafair = AccumFairAdaCost(n_estimators=200, saIndex=sa_index, saValue=p_Group,     CSB="CSB2")
+        adafair.fit(X_train, y_train)
 
-            X_train, X_test = X[train_index], X[test_index]
-            y_train, y_test = y[train_index], y[test_index]
-
-            for proc in range(1, 2):
-
-                threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc], proc, 200)))
-
-    for process in threads:
-        process.start()
-
-    for process in threads:
-        process.join()
-
-    threads = []
-
-    print "elapsed time = " + str(time.time() - start)
-
-    results = []
-    for suffix in suffixes:
-        infile = open(dataset + suffix, 'rb')
-        temp_buffer = pickle.load(infile)
-        results.append(temp_buffer.performance)
-        infile.close()
-
-    plot_my_results(results, suffixes, "Images/" + dataset + "_single_vs_accum", dataset)
-    delete_temp_files(dataset, suffixes)
+    plot_costs_per_round("Images/" + dataset , adafairnoaccum.costs, adafair.costs)
 
 def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, mode, base_learners):
 
     if mode == 0:
-        classifier = FairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2")
+        classifier = FairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  debug=True, CSB="CSB2")
     elif mode == 1:
-        classifier = AccumFairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2")
+        classifier = AccumFairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, debug=True,   CSB="CSB2")
 
     classifier.fit(X_train, y_train)
 
@@ -132,9 +103,12 @@ def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, datase
     outfile.close()
     mutex.release()
 
-def main(dataset, iterations=5):
-    run_eval(dataset,iterations)
+def main(dataset):
+    run_eval(dataset)
 
 if __name__ == '__main__':
     # main(sys.argv[1], 10)
-    main("bank", 5)
+    main("compass-gender")
+    # main("adult-gender")
+    # main("bank")
+    # main("kdd")

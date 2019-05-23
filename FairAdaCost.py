@@ -483,6 +483,7 @@ class FairAdaCost(BaseWeightBoosting, ClassifierMixin):
         self.cost_protected_negative = 1
         self.cost_non_protected_negative = 1
         self.decay_cost = decay
+        self.costs = []
 
         self.c = c
         self.saIndex = saIndex
@@ -609,6 +610,8 @@ class FairAdaCost(BaseWeightBoosting, ClassifierMixin):
             self.cost_protected_negative = (1 + diff_tnr)
         elif diff_tpr < 0:
             self.cost_non_protected_negative = (1 + abs(diff_tnr))
+
+        self.costs.append(str(diff_tpr) + "," + str(diff_tnr))
 
         return abs((tpr_non_protected - tpr_protected)) + abs((tnr_non_protected - tnr_protected))
 
