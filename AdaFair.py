@@ -37,7 +37,7 @@ from sklearn.tree.tree import BaseDecisionTree, DTYPE, DecisionTreeClassifier
 from sklearn.utils.validation import has_fit_parameter, check_is_fitted, check_array, check_X_y, check_random_state
 
 __all__ = [
-    'AccumFairAdaCost',
+    'AdaFair',
     'AdaBoostRegressor',
 ]
 
@@ -384,7 +384,7 @@ def _samme_proba(estimator, n_classes, X):
                               * log_proba.sum(axis=1)[:, np.newaxis])
 
 
-class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
+class AdaFair(BaseWeightBoosting, ClassifierMixin):
     """An AdaBoost classifier.
 
     An AdaBoost [1] classifier is a meta-estimator that begins by fitting a
@@ -467,9 +467,9 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
                  random_state=None,
                  saIndex=None,saValue=None,
                  debug=False, CSB="CSB2",
-                 X_test=None, y_test=None, decay=True, c = 1):
+                 X_test=None, y_test=None, c = 1):
 
-        super(AccumFairAdaCost, self).__init__(
+        super(AdaFair, self).__init__(
             base_estimator=base_estimator,
             n_estimators=n_estimators,
             learning_rate=learning_rate,
@@ -480,7 +480,6 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
 
         self.cost_protected_negative = 1
         self.cost_non_protected_negative = 1
-        self.decay_cost = decay
 
         self.c = c
         self.saIndex = saIndex
@@ -520,11 +519,11 @@ class AccumFairAdaCost(BaseWeightBoosting, ClassifierMixin):
             raise ValueError("algorithm %s is not supported" % self.algorithm)
 
         # Fit
-        return super(AccumFairAdaCost, self).fit(X, y, sample_weight)
+        return super(AdaFair, self).fit(X, y, sample_weight)
 
     def _validate_estimator(self):
         """Check the estimator and set the base_estimator_ attribute."""
-        super(AccumFairAdaCost, self)._validate_estimator(
+        super(AdaFair, self)._validate_estimator(
             default=DecisionTreeClassifier(max_depth=1))
 
         #  SAMME-R requires predict_proba-enabled base estimators

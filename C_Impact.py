@@ -12,7 +12,7 @@ import sys
 
 from sklearn.model_selection import train_test_split
 
-from AccumFairAdaCost import AccumFairAdaCost
+from AdaFair import AdaFair
 
 sys.path.insert(0, 'DataPreprocessing')
 sys.path.insert(0, 'equalized_odds_and_calibration-master')
@@ -119,9 +119,9 @@ def run_eval(dataset, iterations):
 
 def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, mode, base_learners, c):
     if mode == 1:
-        classifier = AccumFairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB1", c=c)
+        classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB1", c=c)
     elif mode == 2:
-        classifier = AccumFairAdaCost( n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2", c=c)
+        classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2", c=c)
 
     classifier.fit(X_train, y_train)
 

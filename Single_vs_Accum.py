@@ -8,13 +8,13 @@ from sklearn.model_selection import ShuffleSplit
 matplotlib.use('Agg')
 import sys
 
-from AccumFairAdaCost import AccumFairAdaCost
+from AdaFair import AdaFair
 
 sys.path.insert(0, 'DataPreprocessing')
 sys.path.insert(0, 'equalized_odds_and_calibration-master')
 
 import time
-from FairAdaCost import FairAdaCost
+from AdaFairNoCumul import AdaFairNoCumul
 
 from load_dutch_data import load_dutch_data
 # from load_german import load_german
@@ -113,9 +113,9 @@ def run_eval(dataset, iterations):
 def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, mode, base_learners):
 
     if mode == 0:
-        classifier = FairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2")
+        classifier = AdaFairNoCumul(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2")
     elif mode == 1:
-        classifier = AccumFairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2")
+        classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2")
 
     classifier.fit(X_train, y_train)
 
@@ -132,9 +132,9 @@ def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, datase
     outfile.close()
     mutex.release()
 
-def main(dataset, iterations=5):
+def main(dataset, iterations=10):
     run_eval(dataset,iterations)
 
 if __name__ == '__main__':
     # main(sys.argv[1], 10)
-    main("bank", 5)
+    main("bank", 10)

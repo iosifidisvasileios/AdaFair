@@ -37,7 +37,7 @@ from sklearn.tree.tree import BaseDecisionTree, DTYPE, DecisionTreeClassifier
 from sklearn.utils.validation import has_fit_parameter, check_is_fitted, check_array, check_X_y, check_random_state
 
 __all__ = [
-    'FairAdaCost',
+    'AdaFairNoCumul',
     'AdaBoostRegressor',
 ]
 
@@ -380,7 +380,7 @@ def _samme_proba(estimator, n_classes, X):
                               * log_proba.sum(axis=1)[:, np.newaxis])
 
 
-class FairAdaCost(BaseWeightBoosting, ClassifierMixin):
+class AdaFairNoCumul(BaseWeightBoosting, ClassifierMixin):
     """An AdaBoost classifier.
 
     An AdaBoost [1] classifier is a meta-estimator that begins by fitting a
@@ -465,7 +465,7 @@ class FairAdaCost(BaseWeightBoosting, ClassifierMixin):
                  debug=False, CSB="CSB2",
                  X_test=None, y_test=None, decay=True, c = 1):
 
-        super(FairAdaCost, self).__init__(
+        super(AdaFairNoCumul, self).__init__(
             base_estimator=base_estimator,
             n_estimators=n_estimators,
             learning_rate=learning_rate,
@@ -521,11 +521,11 @@ class FairAdaCost(BaseWeightBoosting, ClassifierMixin):
             raise ValueError("algorithm %s is not supported" % self.algorithm)
 
         # Fit
-        return super(FairAdaCost, self).fit(X, y, sample_weight)
+        return super(AdaFairNoCumul, self).fit(X, y, sample_weight)
 
     def _validate_estimator(self):
         """Check the estimator and set the base_estimator_ attribute."""
-        super(FairAdaCost, self)._validate_estimator(
+        super(AdaFairNoCumul, self)._validate_estimator(
             default=DecisionTreeClassifier(max_depth=1))
 
         #  SAMME-R requires predict_proba-enabled base estimators

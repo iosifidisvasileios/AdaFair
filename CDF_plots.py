@@ -14,7 +14,7 @@ import sys
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.tree import DecisionTreeClassifier
 
-from AccumFairAdaCost import AccumFairAdaCost
+from AdaFair import AdaFair
 
 sys.path.insert(0, 'DataPreprocessing')
 sys.path.insert(0, 'equalized_odds_and_calibration-master')
@@ -23,7 +23,7 @@ sys.path.insert(0, 'equalized_odds_and_calibration-master')
 
 import time
 from AdaCost import AdaCostClassifier
-from FairAdaCost import FairAdaCost
+from AdaFairNoCumul import AdaFairNoCumul
 from load_kdd import load_kdd
 # from load_german import load_german
 from load_compas_data import load_compas
@@ -163,9 +163,9 @@ def train_classifier(X_train, y_train, sa_index, p_Group, mode, base_learners):
     if mode == 0:
         classifier = AdaCostClassifier(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB1", debug=True)
     elif mode == 1:
-        classifier = AccumFairAdaCost(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB1", debug=True,c=1)
+        classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB1", debug=True, c=1)
     elif mode == 2:
-        classifier = AccumFairAdaCost( n_estimators=base_learners, saIndex=sa_index, saValue=p_Group,  CSB="CSB2", debug=True, c=1)
+        classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2", debug=True, c=1)
 
     classifier.fit(X_train, y_train)
 
