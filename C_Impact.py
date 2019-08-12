@@ -144,10 +144,10 @@ def main(dataset, iterations):
 
 
 if __name__ == '__main__':
-    # main(sys.argv[1])
-    # main("compass-gender",10)
-    # main("adult-gender", 2)
-    # main("bank", 2)
-    main("kdd", 1)
+    # run_eval(sys.argv[1], int(sys.argv[2]))
+    main("compass-gender",10)
+    # main("adult-gender", 10)
+    # main("bank", 10)
+    # main("kdd", 10)
 
 
