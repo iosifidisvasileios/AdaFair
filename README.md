@@ -1,1 +1,1 @@
-# fair-boosting
+# AdaFair
