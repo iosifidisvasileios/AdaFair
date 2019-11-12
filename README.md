@@ -1,5 +1,5 @@
 # AdaFair
-This repository is an implementation of the paper ["AdaFair: Cumulative Fairness Adaptive Boosting"](https://arxiv.org/pdf/1909.08982.pdf)
+This repository is an implementation of the paper ["AdaFair: Cumulative Fairness Adaptive Boosting"](https://dl.acm.org/citation.cfm?id=3357974)
 
 This repo contains the source code for AdaFair as well as AdaCost and SMOTEboost. In addition, the employed datasets are also uploaded. 
 
