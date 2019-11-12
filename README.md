@@ -6,9 +6,11 @@ This repo contains the source code for AdaFair as well as AdaCost and SMOTEboost
 
 If you use this paper, please do not forget to cite it:
 
-@article{iosifidis2019adafair,
+@inproceedings{iosifidis2019adafair,
   title={AdaFair: Cumulative Fairness Adaptive Boosting},
   author={Iosifidis, Vasileios and Ntoutsi, Eirini},
-  journal={arXiv preprint arXiv:1909.08982},
-  year={2019}
+  booktitle={Proceedings of the 28th ACM International Conference on Information and Knowledge Management},
+  pages={781--790},
+  year={2019},
+  organization={ACM}
 }
