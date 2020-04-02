@@ -210,7 +210,7 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
 
         if self.debug:
             self.get_confidence_scores(X)
-        print("best #weak learners = " + str(self.theta))
+        # print("best #weak learners = " + str(self.theta))
 
         return self
 
@@ -681,7 +681,7 @@ class AdaFairSP(BaseWeightBoosting, ClassifierMixin):
             cumulative_balanced_error = 1 - sklearn.metrics.balanced_accuracy_score(y, y_predict)
             fairness = 1
 
-        print("balanced error", cumulative_balanced_error)
+        # print("balanced error", cumulative_balanced_error)
         if not iboost == self.n_estimators - 1:
             for idx, row in enumerate(sample_weight):
                 if y[idx] == 1 and y_predict[idx] != 1:

@@ -29,7 +29,8 @@ from load_credit import load_credit
 from load_kdd import load_kdd
 
 from load_bank import load_bank
-from my_useful_functions import calculate_performance_SP, plot_my_results
+from my_useful_functions import calculate_performance_SP, plot_my_results_sp
+
 
 class serialazible_list(object):
     def __init__(self):
@@ -94,7 +95,7 @@ def run_eval(dataset, iterations):
             y_train, y_test = y[train_index], y[test_index]
 
             for proc in range(0, 3):
-                threads.append(Process(target=train_classifier, args=( X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc],proc, 100, 1)))
+                threads.append(Process(target=train_classifier, args=( X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc],proc, 200, 1)))
 
     for process in threads:
         process.start()
@@ -109,7 +110,7 @@ def run_eval(dataset, iterations):
         results.append(temp_buffer.performance)
         infile.close()
 
-    plot_my_results(results, suffixes, "Images/StatisticalParity/" + dataset, dataset)
+    plot_my_results_sp(results, suffixes, "Images/StatisticalParity/" + dataset, dataset)
     delete_temp_files(dataset, suffixes)
 
 def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, mode, base_learners, c):
@@ -118,7 +119,7 @@ def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, datase
     elif mode == 1:
         classifier = AdaFairSP(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2", c=c)
     elif mode == 2:
-        classifier = SMOTEBoost(n_estimators=base_learners,saIndex=sa_index,n_samples=2, saValue=p_Group,  CSB="CSB1" )
+        classifier = SMOTEBoost(n_estimators=base_learners,saIndex=sa_index,n_samples=10, saValue=p_Group,  CSB="CSB1" )
     classifier.fit(X_train, y_train)
 
     y_pred_probs = classifier.predict_proba(X_test)[:, 1]
@@ -137,12 +138,11 @@ def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, datase
 
 
 if __name__ == '__main__':
-    # run_eval(sys.argv[1], int(sys.argv[2]))
-    run_eval("compass-race", 10)
-    run_eval("adult-race", 5)
-    run_eval("compass-gender", 5)
-    run_eval("dutch", 5)
-    run_eval("bank", 5)
-    # run_eval("diabetes", 5)
-    # run_eval("adult-gender", 5)
+    run_eval("adult-gender", 2)
+    # run_eval("adult-race", 10)
+    # run_eval("compass-race", 10)
+    # run_eval("compass-gender", 10)
+    # run_eval("dutch", 10)
+    # run_eval("bank", 10)
+    # run_eval("diabetes", 10)
     # run_eval("kdd", 10)

@@ -93,9 +93,12 @@ def calculate_performance(data, labels, predictions, probs, saIndex, saValue):
     output["TNR_non_protected"] = tnr_non_protected
     return output
 
-
-
 def calculate_performance_SP(data, labels, predictions, probs, saIndex, saValue):
+    protected_pos = 0.
+    protected_neg = 0.
+    non_protected_pos = 0.
+    non_protected_neg = 0.
+
     tp_protected = 0.
     tn_protected = 0.
     fp_protected = 0.
@@ -105,33 +108,50 @@ def calculate_performance_SP(data, labels, predictions, probs, saIndex, saValue)
     tn_non_protected = 0.
     fp_non_protected = 0.
     fn_non_protected = 0.
+
+
+
+
     for idx, val in enumerate(data):
         # protrcted population
         if val[saIndex] == saValue:
-            if labels[idx] == predictions[idx]:
-                if labels[idx] == 1:
-                    tp_protected += 1
-                else:
-                    tn_protected += 1
+            if predictions[idx] == 1:
+                protected_pos += 1.
             else:
-                if labels[idx] == 1:
-                    fn_protected += 1
-                else:
-                    fp_protected += 1
+                protected_neg += 1.
 
-        else:
+
             # correctly classified
             if labels[idx] == predictions[idx]:
                 if labels[idx] == 1:
-                    tp_non_protected += 1
+                    tp_protected += 1.
                 else:
-                    tn_non_protected += 1
+                    tn_protected += 1.
             # misclassified
             else:
                 if labels[idx] == 1:
-                    fn_non_protected += 1
+                    fn_protected += 1.
                 else:
-                    fp_non_protected += 1
+                    fp_protected += 1.
+
+        else:
+            if predictions[idx] == 1:
+                non_protected_pos += 1.
+            else:
+                non_protected_neg += 1.
+
+            # correctly classified
+            if labels[idx] == predictions[idx]:
+                if labels[idx] == 1:
+                    tp_non_protected += 1.
+                else:
+                    tn_non_protected += 1.
+            # misclassified
+            else:
+                if labels[idx] == 1:
+                    fn_non_protected += 1.
+                else:
+                    fp_non_protected += 1.
 
     tpr_protected = tp_protected / (tp_protected + fn_protected)
     tnr_protected = tn_protected / (tn_protected + fp_protected)
@@ -139,22 +159,28 @@ def calculate_performance_SP(data, labels, predictions, probs, saIndex, saValue)
     tpr_non_protected = tp_non_protected / (tp_non_protected + fn_non_protected)
     tnr_non_protected = tn_non_protected / (tn_non_protected + fp_non_protected)
 
-    C_prot = (tp_protected + fn_protected) / (tp_protected + fn_protected + tn_protected + fp_protected)
-    C_non_prot = (tp_non_protected + fn_non_protected) / (
-                tp_non_protected + fn_non_protected + tn_non_protected + fp_non_protected)
+    C_prot = (protected_pos) / (protected_pos + protected_neg)
+    C_non_prot = (non_protected_pos) / (non_protected_pos + non_protected_neg)
 
     stat_par = C_non_prot - C_prot
+
     output = dict()
+
+    # output["balanced_accuracy"] = balanced_accuracy_score(labels, predictions)
     output["balanced_accuracy"] =( (tp_protected + tp_non_protected)/(tp_protected + tp_non_protected + fn_protected + fn_non_protected) +
                                    (tn_protected + tn_non_protected) / (tn_protected + tn_non_protected + fp_protected + fp_non_protected))*0.5
 
     output["accuracy"] = accuracy_score(labels, predictions)
-    output["fairness"] = stat_par
-    output["TPR_protected"] = tpr_protected
-    output["TPR_non_protected"] = tpr_non_protected
-    output["TNR_protected"] = tnr_protected
-    output["TNR_non_protected"] = tnr_non_protected
+    output["fairness"] = abs(stat_par)
+
+    output["Positive_prot_pred"] = C_prot
+    output["Positive_non_prot_pred"] = C_non_prot
+    output["Negative_prot_pred"] = (protected_neg) / (protected_pos + protected_neg)
+    output["Negative_non_prot_pred"] = (non_protected_neg) / (non_protected_pos + non_protected_neg)
+
     return output
+
+
 
 
 def plot_results_of_c_impact(csb1, csb2, steps, output_dir, dataset):
@@ -578,6 +604,113 @@ def plot_my_results(results, names, output_dir, dataset):
 
     plt.xticks(index + 1.5*bar_width ,
                ('Accuracy', 'Balanced Accuracy', 'Equalized Odds', 'TPR Prot.', 'TPR Non-Prot.', 'TNR Prot.', 'TNR Non-Prot.'))
+
+    colors = ['b','g','r','c','m','y','k', 'dimgray']
+    for i in range(0, len(names)):
+        plt.bar(index + bar_width * i,
+                [accuracy_list[i], balanced_accuracy_list[i], fairness_list[i], tpr_protected_list[i],
+                 tpr_non_protected_list[i], tnr_protected_list[i], tnr_non_protected_list[i]], bar_width,
+                yerr=[std_accuracy_list[i], std_balanced_accuracy_list[i], std_fairness_list[i],
+                      std_tpr_protected_list[i], std_tpr_non_protected_list[i], std_tnr_protected_list[i],
+                      std_tnr_non_protected_list[i]],
+                label=names[i], color=colors[i],edgecolor='black')
+
+    plt.legend(loc='best',ncol=1, shadow=False)
+    plt.ylabel('(%)')
+    # plt.title("Performance for " + dataset)
+    plt.savefig(output_dir + "_performance.png",bbox_inches='tight', dpi=200)
+    print (names)
+    print ("accuracy_lis t= " + str(accuracy_list))
+    print ("std_accuracy_list = " + str(std_accuracy_list))
+    print ("balanced_accuracy_list=  " + str(balanced_accuracy_list))
+    print ("std_balanced_accuracy_list = " + str(std_balanced_accuracy_list))
+
+    print ("fairness_list=  " + str(fairness_list))
+    print ("std_fairness_list = " + str(std_fairness_list))
+
+    print ("tpr_protected_list = " + str(tpr_protected_list))
+    print ("std_tpr_protected_list = " + str(std_tpr_protected_list))
+
+    print ("tpr_non_protected_list = " + str(tpr_non_protected_list))
+    print ("std_tpr_non_protected_list = " + str(std_tpr_non_protected_list))
+
+    print ("tnr_protected_list = " + str(tnr_protected_list))
+    print ("std_tnr_protected_list = " + str(std_tnr_protected_list))
+
+    print ("tnr_non_protected_list = " + str(tnr_non_protected_list))
+    print ("std_tnr_non_protected_list = " + str(std_tnr_non_protected_list))
+
+
+def plot_my_results_sp(results, names, output_dir, dataset):
+    accuracy_list = []
+    balanced_accuracy_list = []
+    fairness_list = []
+    tpr_protected_list = []
+    tpr_non_protected_list = []
+    tnr_protected_list = []
+    tnr_non_protected_list = []
+    std_accuracy_list = []
+    std_balanced_accuracy_list = []
+    std_fairness_list = []
+    std_tpr_protected_list = []
+    std_tpr_non_protected_list = []
+    std_tnr_protected_list = []
+    std_tnr_non_protected_list = []
+
+    for list_of_results in results:
+
+        accuracy = []
+        balanced_accuracy = []
+        fairness = []
+        tpr_protected = []
+        tpr_non_protected = []
+        tnr_protected = []
+        tnr_non_protected = []
+
+        for item in list_of_results:
+            accuracy.append(item["accuracy"])
+            balanced_accuracy.append(item["balanced_accuracy"])
+            fairness.append(item["fairness"])
+            tpr_protected.append(item["Positive_prot_pred"])
+            tpr_non_protected.append(item["Positive_non_prot_pred"])
+            tnr_protected.append(item["Negative_prot_pred"])
+            tnr_non_protected.append(item["Negative_non_prot_pred"])
+
+        numpy.mean(accuracy)
+        numpy.std(accuracy)
+
+        accuracy_list.append(numpy.mean(accuracy))
+        balanced_accuracy_list.append(numpy.mean(balanced_accuracy))
+        fairness_list.append(numpy.mean(fairness))
+        tpr_protected_list.append(numpy.mean(tpr_protected))
+        tpr_non_protected_list.append(numpy.mean(tpr_non_protected))
+        tnr_protected_list.append(numpy.mean(tnr_protected))
+        tnr_non_protected_list.append(numpy.mean(tnr_non_protected))
+
+        std_accuracy_list.append(numpy.std(accuracy))
+        std_balanced_accuracy_list.append(numpy.std(balanced_accuracy))
+        std_fairness_list.append(numpy.std(fairness))
+        std_tpr_protected_list.append(numpy.std(tpr_protected))
+        std_tpr_non_protected_list.append(numpy.std(tpr_non_protected))
+        std_tnr_protected_list.append(numpy.std(tnr_protected))
+        std_tnr_non_protected_list.append(numpy.std(tnr_non_protected))
+
+    plt.figure(figsize=(9, 9))
+    plt.rcParams.update({'font.size': 14})
+    plt.ylim([0,1])
+    plt.yticks(numpy.arange(0, 1, step=0.05))
+
+    plt.setp(plt.gca().get_xticklabels(), rotation=20, horizontalalignment='right')
+
+    plt.grid(True, axis='y')
+    index = numpy.arange(0, 8, step=1.3)
+    # index = numpy.arange(7)
+    bar_width = 0.175
+
+
+
+    plt.xticks(index + 1.5*bar_width ,
+               ('Accuracy', 'Balanced Accuracy', 'St.Parity', 'Pos.Prot', 'Pos.Non-Prot.', 'Neg.Prot.', 'Neg.Non-Prot.'))
 
     colors = ['b','g','r','c','m','y','k', 'dimgray']
     for i in range(0, len(names)):
