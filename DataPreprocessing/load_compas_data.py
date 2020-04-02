@@ -1,5 +1,4 @@
 from __future__ import division
-import urllib2
 import os,sys
 import numpy as np
 import pandas as pd
@@ -20,22 +19,6 @@ np.random.seed(SEED)
     The code will look for the data file in the present directory, if it is not found, it will download them from GitHub.
 """
 
-def check_data_file(fname):
-    files = os.listdir(".") # get the current directory listing
-    print "Looking for file '%s' in the current directory..." % fname
-
-    if fname not in files:
-        print "'%s' not found! Downloading from GitHub..." % fname
-        addr = "https://raw.githubusercontent.com/propublica/compas-analysis/master/compas-scores-two-years.csv"
-        response = urllib2.urlopen(addr)
-        data = response.read()
-        fileOut = open(fname, "w")
-        fileOut.write(data)
-        fileOut.close()
-        print "'%s' download and saved locally.." % fname
-    else:
-        print "File found in current directory.."
-    
 
 def load_compas(sa):
 
@@ -84,7 +67,7 @@ def load_compas(sa):
 
 
 
-	print collections.Counter(data[sa])
+	print (collections.Counter(data[sa]))
 
 	test = pd.DataFrame.from_dict(data)
 	# print test
@@ -93,12 +76,6 @@ def load_compas(sa):
 	# convert class label 0 to -1
 	y = data[CLASS_FEATURE]
 	y[y==0] = -1
-
-
-	print "\nNumber of people recidivating within two years"
-	print pd.Series(y).value_counts()
-	print "\n"
-
 
 	X = np.array([]).reshape(len(y), 0) # empty array with num rows same as num examples, will hstack the features to it
 	x_control = defaultdict(list)
@@ -147,14 +124,14 @@ def load_compas(sa):
 	# sys.exit(1)
 
 	"""permute the date randomly"""
-	perm = range(0,X.shape[0])
-	shuffle(perm)
-	X = X[perm]
-	y = y[perm]
-	for k in x_control.keys():
-		x_control[k] = x_control[k][perm]
+	# perm = range(0,X.shape[0])
+	# shuffle(perm)
+	# X = X[perm]
+	# y = y[perm]
+	# for k in x_control.keys():
+	# 	x_control[k] = x_control[k][perm]
 	feature_names.append('target')
-	print "Features we will be using for classification are:", feature_names, "\n"
+	print ("Features we will be using for classification are:", feature_names, "\n")
 
 	# pd.DataFrame(np.c_[X, y]).to_csv("test_compas_X.csv", header=feature_names)
 	# print np.sum(X[:,feature_names.index(SENSITIVE_ATTRS[0])])

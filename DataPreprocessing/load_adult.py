@@ -1,5 +1,5 @@
 from __future__ import division
-import urllib2
+# import urllib2
 import os,sys
 import numpy as np
 import pandas as pd
@@ -43,13 +43,6 @@ def load_adult(sa):
 	y = data[CLASS_FEATURE]
 	y[y==0] = -1
 
-	
-	
-	print "\nNumber of people who receive more than 50K"
-	print pd.Series(y).value_counts()
-	print "\n"
-
-
 	X = np.array([]).reshape(len(y), 0) # empty array with num rows same as num examples, will hstack the features to it
 	x_control = defaultdict(list)
 
@@ -58,7 +51,7 @@ def load_adult(sa):
 		vals = data[attr]
 		if attr in CONT_VARIABLES:
 			vals = [float(v) for v in vals]
-			vals = preprocessing.scale(vals) # 0 mean and 1 variance  
+			vals = preprocessing.scale(vals) # 0 mean and 1 variance
 			vals = np.reshape(vals, (len(y), -1)) # convert from 1-d arr to a 2-d arr with one col
 
 		else: # for binary categorical variables, the label binarizer uses just one var instead of two
@@ -69,7 +62,6 @@ def load_adult(sa):
 		# add to sensitive features dict
 		if attr in SENSITIVE_ATTRS:
 			x_control[attr] = vals
-
 
 		# add to learnable features
 		X = np.hstack((X, vals))
@@ -93,12 +85,12 @@ def load_adult(sa):
 	# sys.exit(1)
 
 	"""permute the date randomly"""
-	perm = range(0,X.shape[0])
-	shuffle(perm)
-	X = X[perm]
-	y = y[perm]
-	for k in x_control.keys():
-		x_control[k] = x_control[k][perm]
+	# perm = range(0,X.shape[0])
+	# shuffle(perm)
+	# X = X[perm]
+	# y = y[perm]
+	# for k in x_control.keys():
+	# 	x_control[k] = x_control[k][perm]
 
 
 	# X = ut.add_intercept(X)

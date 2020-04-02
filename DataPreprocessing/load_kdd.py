@@ -1,5 +1,5 @@
 from __future__ import division
-import urllib2
+# import urllib2
 import os,sys
 import numpy as np
 import pandas as pd
@@ -29,12 +29,6 @@ def load_kdd():
 	"country-of-birth-self", "citizenship", "own-business-or-self-employed", "fill-inc-questionnaire-for-veterans-admin", "veterans-benefits",
 	"weeks-worked-in-year", "year"]
 
-
-
-
-
-	# FEATURES_CLASSIFICATION = ["class-of-worker", "education", "marital-stat", "race", "sex", "country-of-birth-self","age","capital-gains", "capital-losses", "weeks-worked-in-year"] #features to be used for classification
-
 	# CONT_VARIABLES = ["capital-gains", "capital-losses", 'age'] # continuous features, will need to be handled separately from categorical features, categorical features will be encoded using one-hot
 	CONT_VARIABLES = ["age", "detailed-industry-recode","detailed-occupation-recode","wage-per-hour","capital-gains", "capital-losses", "num-persons-worked-for-employer", "dividends-from-stocks", "veterans-benefits","weeks-worked-in-year", "year",] # continuous features, will need to be handled separately from categorical features, categorical features will be encoded using one-hot
 
@@ -60,16 +54,6 @@ def load_kdd():
 	# convert class label 0 to -1
 	y = data[CLASS_FEATURE]
 	y[y==0] = -1
-
-	sen = data[SENSITIVE_ATTRS[0]]
-
-	print "\nNumber of people bank yes"
-	print pd.Series(y).value_counts()
-	print "\n"
-	print "\nNumber of married"
-	print pd.Series(sen).value_counts()
-	print "\n"
-
 
 	X = np.array([]).reshape(len(y), 0) # empty array with num rows same as num examples, will hstack the features to it
 	x_control = defaultdict(list)
@@ -104,33 +88,10 @@ def load_kdd():
 				for k in lb.classes_: # non-binary categorical features, need to add the names for each cat
 					feature_names.append(attr + "_" + str(k))
 
-
 	# convert the sensitive feature to 1-d array
 	x_control = dict(x_control)
 	for k in x_control.keys():
 		assert(x_control[k].shape[1] == 1) # make sure that the sensitive feature is binary after one hot encoding
 		x_control[k] = np.array(x_control[k]).flatten()
 
-	# sys.exit(1)
-
-	"""permute the date randomly"""
-	perm = range(0,X.shape[0])
-	shuffle(perm)
-	X = X[perm]
-	y = y[perm]
-	for k in x_control.keys():
-		x_control[k] = x_control[k][perm]
-
-
-	# X = ut.add_intercept(X)
-
-	# feature_names = ["intercept"] + feature_names
-	# assert(len(feature_names) == X.shape[1])
-	# print "Features we will be using for classification are:", feature_names, "\n"
-	# print x_control
-
 	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0, x_control
-
-# Data_type = 1
-# X, y, x_control = load_adult_data()
-# sensitive_attrs = x_control.keys()

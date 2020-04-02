@@ -1,5 +1,4 @@
 from __future__ import division
-import urllib2
 import os,sys
 
 import collections
@@ -56,15 +55,6 @@ def load_dutch_data():
 	y = data[CLASS_FEATURE]
 	y[y==0] = -1
 
-	print collections.Counter(data["sex"])
-
-	print "\nNumber of people with prestigious professions"
-	print pd.Series(y).value_counts()
-	print "\n"
-	# convert class label 0 to -1
-
-
-
 
 	X = np.array([]).reshape(len(y), 0) # empty array with num rows same as num examples, will hstack the features to it
 	x_control = defaultdict(list)
@@ -106,15 +96,7 @@ def load_dutch_data():
 		assert(x_control[k].shape[1] == 1) # make sure that the sensitive feature is binary after one hot encoding
 		x_control[k] = np.array(x_control[k]).flatten()
 
-	# sys.exit(1)
 
-	"""permute the date randomly"""
-	perm = range(0,X.shape[0])
-	shuffle(perm)
-	X = X[perm]
-	y = y[perm]
-	for k in x_control.keys():
-		x_control[k] = x_control[k][perm]
 
 
 	# X = ut.add_intercept(X)
