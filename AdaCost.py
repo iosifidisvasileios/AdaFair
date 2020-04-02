@@ -36,8 +36,7 @@ from sklearn.tree.tree import BaseDecisionTree, DTYPE, DecisionTreeClassifier
 from sklearn.utils.validation import has_fit_parameter, check_is_fitted, check_array, check_X_y, check_random_state
 
 __all__ = [
-    'AdaCostClassifier',
-    'AdaBoostRegressor',
+    'AdaCostClassifier'
 ]
 
 
