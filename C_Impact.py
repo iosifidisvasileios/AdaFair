@@ -15,7 +15,6 @@ from sklearn.model_selection import train_test_split
 from AdaFair import AdaFair
 
 sys.path.insert(0, 'DataPreprocessing')
-sys.path.insert(0, 'equalized_odds_and_calibration-master')
 
 # import funcs_disp_mist as fdm
 
@@ -104,7 +103,7 @@ def run_eval(dataset, iterations):
 
         threads = []
 
-        print "elapsed time = " + str(time.time() - start)
+        print ("elapsed time = " + str(time.time() - start))
 
     results = []
     for suffix in suffixes:

@@ -3,12 +3,17 @@
 import matplotlib
 matplotlib.use('Agg')
 
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, balanced_accuracy_score
 import numpy
 import matplotlib.pyplot as plt
 
 
 def calculate_performance(data, labels, predictions, probs, saIndex, saValue):
+    protected_pos = 0.
+    protected_neg = 0.
+    non_protected_pos = 0.
+    non_protected_neg = 0.
+
     tp_protected = 0.
     tn_protected = 0.
     fp_protected = 0.
@@ -21,13 +26,93 @@ def calculate_performance(data, labels, predictions, probs, saIndex, saValue):
     for idx, val in enumerate(data):
         # protrcted population
         if val[saIndex] == saValue:
+            if predictions[idx] == 1:
+                protected_pos += 1.
+            else:
+                protected_neg += 1.
+
+
             # correctly classified
+            if labels[idx] == predictions[idx]:
+                if labels[idx] == 1:
+                    tp_protected += 1.
+                else:
+                    tn_protected += 1.
+            # misclassified
+            else:
+                if labels[idx] == 1:
+                    fn_protected += 1.
+                else:
+                    fp_protected += 1.
+
+        else:
+            if predictions[idx] == 1:
+                non_protected_pos += 1.
+            else:
+                non_protected_neg += 1.
+
+            # correctly classified
+            if labels[idx] == predictions[idx]:
+                if labels[idx] == 1:
+                    tp_non_protected += 1.
+                else:
+                    tn_non_protected += 1.
+            # misclassified
+            else:
+                if labels[idx] == 1:
+                    fn_non_protected += 1.
+                else:
+                    fp_non_protected += 1.
+
+    tpr_protected = tp_protected / (tp_protected + fn_protected)
+    tnr_protected = tn_protected / (tn_protected + fp_protected)
+
+    tpr_non_protected = tp_non_protected / (tp_non_protected + fn_non_protected)
+    tnr_non_protected = tn_non_protected / (tn_non_protected + fp_non_protected)
+
+    C_prot = (protected_pos) / (protected_pos + protected_neg)
+    C_non_prot = (non_protected_pos) / (non_protected_pos + non_protected_neg)
+
+    stat_par = C_non_prot - C_prot
+
+    output = dict()
+
+    # output["balanced_accuracy"] = balanced_accuracy_score(labels, predictions)
+    output["balanced_accuracy"] =( (tp_protected + tp_non_protected)/(tp_protected + tp_non_protected + fn_protected + fn_non_protected) +
+                                   (tn_protected + tn_non_protected) / (tn_protected + tn_non_protected + fp_protected + fp_non_protected))*0.5
+
+    output["accuracy"] = accuracy_score(labels, predictions)
+    # output["dTPR"] = tpr_non_protected - tpr_protected
+    # output["dTNR"] = tnr_non_protected - tnr_protected
+    output["fairness"] = abs(tpr_non_protected - tpr_protected) + abs(tnr_non_protected - tnr_protected)
+    # output["fairness"] = abs(stat_par)
+
+    output["TPR_protected"] = tpr_protected
+    output["TPR_non_protected"] = tpr_non_protected
+    output["TNR_protected"] = tnr_protected
+    output["TNR_non_protected"] = tnr_non_protected
+    return output
+
+
+
+def calculate_performance_SP(data, labels, predictions, probs, saIndex, saValue):
+    tp_protected = 0.
+    tn_protected = 0.
+    fp_protected = 0.
+    fn_protected = 0.
+
+    tp_non_protected = 0.
+    tn_non_protected = 0.
+    fp_non_protected = 0.
+    fn_non_protected = 0.
+    for idx, val in enumerate(data):
+        # protrcted population
+        if val[saIndex] == saValue:
             if labels[idx] == predictions[idx]:
                 if labels[idx] == 1:
                     tp_protected += 1
                 else:
                     tn_protected += 1
-            # misclassified
             else:
                 if labels[idx] == 1:
                     fn_protected += 1
@@ -53,26 +138,18 @@ def calculate_performance(data, labels, predictions, probs, saIndex, saValue):
 
     tpr_non_protected = tp_non_protected / (tp_non_protected + fn_non_protected)
     tnr_non_protected = tn_non_protected / (tn_non_protected + fp_non_protected)
-    # print "accuracy = " + str(accuracy_score(labels, predictions)) + \
-    #       ",auc = " + str(roc_auc_score(labels, probs)) + \
-    #       ", dTPR = " + str((tpr_non_protected - tpr_protected) * 100) + \
-    #       ", dTNR = " + str((tnr_non_protected - tnr_protected) * 100) + \
-    #       ", TPR_protected = " + str(tpr_protected) + \
-    #       ", TPR_non_protected = " + str(tpr_non_protected) + \
-    #       ", TNR_protected = " + str(tnr_protected) + \
-    #       ", TNR_non_protected = " + str(tnr_non_protected)
 
+    C_prot = (tp_protected + fn_protected) / (tp_protected + fn_protected + tn_protected + fp_protected)
+    C_non_prot = (tp_non_protected + fn_non_protected) / (
+                tp_non_protected + fn_non_protected + tn_non_protected + fp_non_protected)
+
+    stat_par = C_non_prot - C_prot
     output = dict()
-
-    # output["balanced_accuracy"] = balanced_accuracy_score(labels, predictions)
     output["balanced_accuracy"] =( (tp_protected + tp_non_protected)/(tp_protected + tp_non_protected + fn_protected + fn_non_protected) +
                                    (tn_protected + tn_non_protected) / (tn_protected + tn_non_protected + fp_protected + fp_non_protected))*0.5
 
     output["accuracy"] = accuracy_score(labels, predictions)
-    # output["dTPR"] = tpr_non_protected - tpr_protected
-    # output["dTNR"] = tnr_non_protected - tnr_protected
-    output["fairness"] = abs(tpr_non_protected - tpr_protected) + abs(tnr_non_protected - tnr_protected)
-
+    output["fairness"] = stat_par
     output["TPR_protected"] = tpr_protected
     output["TPR_non_protected"] = tpr_non_protected
     output["TNR_protected"] = tnr_protected
@@ -172,13 +249,13 @@ def plot_results_of_c_impact(csb1, csb2, steps, output_dir, dataset):
     # plt.ylabel('(%)')
     # plt.title("Impact of c for " + dataset + " dataset")
 
-    print "csb2_accuracy_list " + str(csb2_accuracy_list)
-    print "csb2_balanced_accuracy_list " + str(csb2_balanced_accuracy_list)
-    print "csb2_fairness_list " + str(csb2_fairness_list)
-    print "csb2_tpr_protected_list " + str(csb2_tpr_protected_list)
-    print "csb2_tpr_non_protected_list " + str(csb2_tpr_non_protected_list)
-    print "csb2_tnr_protected_list " + str(csb2_tnr_protected_list)
-    print "csb2_tnr_non_protected_list " + str(csb2_tnr_non_protected_list)
+    print( "csb2_accuracy_list " + str(csb2_accuracy_list))
+    print ("csb2_balanced_accuracy_list " + str(csb2_balanced_accuracy_list))
+    print ("csb2_fairness_list " + str(csb2_fairness_list))
+    print ("csb2_tpr_protected_list " + str(csb2_tpr_protected_list))
+    print ("csb2_tpr_non_protected_list " + str(csb2_tpr_non_protected_list))
+    print ("csb2_tnr_protected_list " + str(csb2_tnr_protected_list))
+    print ("csb2_tnr_non_protected_list " + str(csb2_tnr_non_protected_list))
 
     plt.savefig(output_dir + dataset + "_c_impact.png", bbox_inches='tight', dpi=200)
 
@@ -214,7 +291,7 @@ def plot_costs_per_round(output, noaccum, adafair):
     plt.savefig(output+ "_costs.png", bbox_inches='tight', dpi=200,shadow=False,fancybox=True, framealpha=.30)
 
 
-    print accum_tnr
+    print (accum_tnr)
     pass
 
 def plot_results(init, max_cost, step, summary_performance, summary_weights, output_dir, title, plot_weights=True):
@@ -367,10 +444,10 @@ def plot_per_round(rounds, results, objective, output_dir ):
 
     step_list = [i for i in range(0, rounds)]
 
-    print train_fairness
-    print train_error_list
-    print train_bal_error_list
-    print step_list
+    print (train_fairness)
+    print (train_error_list)
+    print (train_bal_error_list)
+    print (step_list)
     plt.figure()
     plt.grid(True)
 
@@ -516,26 +593,26 @@ def plot_my_results(results, names, output_dir, dataset):
     plt.ylabel('(%)')
     # plt.title("Performance for " + dataset)
     plt.savefig(output_dir + "_performance.png",bbox_inches='tight', dpi=200)
-    print names
-    print "accuracy_lis t= " + str(accuracy_list)
-    print "std_accuracy_list = " + str(std_accuracy_list)
-    print "balanced_accuracy_list=  " + str(balanced_accuracy_list)
-    print "std_balanced_accuracy_list = " + str(std_balanced_accuracy_list)
+    print (names)
+    print ("accuracy_lis t= " + str(accuracy_list))
+    print ("std_accuracy_list = " + str(std_accuracy_list))
+    print ("balanced_accuracy_list=  " + str(balanced_accuracy_list))
+    print ("std_balanced_accuracy_list = " + str(std_balanced_accuracy_list))
 
-    print "fairness_list=  " + str(fairness_list)
-    print "std_fairness_list = " + str(std_fairness_list)
+    print ("fairness_list=  " + str(fairness_list))
+    print ("std_fairness_list = " + str(std_fairness_list))
 
-    print "tpr_protected_list = " + str(tpr_protected_list)
-    print "std_tpr_protected_list = " + str(std_tpr_protected_list)
+    print ("tpr_protected_list = " + str(tpr_protected_list))
+    print ("std_tpr_protected_list = " + str(std_tpr_protected_list))
 
-    print "tpr_non_protected_list = " + str(tpr_non_protected_list)
-    print "std_tpr_non_protected_list = " + str(std_tpr_non_protected_list)
+    print ("tpr_non_protected_list = " + str(tpr_non_protected_list))
+    print ("std_tpr_non_protected_list = " + str(std_tpr_non_protected_list))
 
-    print "tnr_protected_list = " + str(tnr_protected_list)
-    print "std_tnr_protected_list = " + str(std_tnr_protected_list)
+    print ("tnr_protected_list = " + str(tnr_protected_list))
+    print ("std_tnr_protected_list = " + str(std_tnr_protected_list))
 
-    print "tnr_non_protected_list = " + str(tnr_non_protected_list)
-    print "std_tnr_non_protected_list = " + str(std_tnr_non_protected_list)
+    print ("tnr_non_protected_list = " + str(tnr_non_protected_list))
+    print ("std_tnr_non_protected_list = " + str(std_tnr_non_protected_list))
 
 
 

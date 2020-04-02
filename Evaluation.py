@@ -14,7 +14,6 @@ import sys
 from AdaFair import AdaFair
 
 sys.path.insert(0, 'DataPreprocessing')
-sys.path.insert(0, 'equalized_odds_and_calibration-master')
 
 import funcs_disp_mist as fdm
 
@@ -156,12 +155,12 @@ def train_zafar(x_train, y_train, x_control_train, x_test, y_test, x_control_tes
         try:
             w = fdm.train_model_disp_mist(x_train, y_train, x_control_train, loss_function, EPS, cons_params)
             rates, acc, balanced_acc,_ = fdm.get_clf_stats(w, x_train, y_train, x_control_train, x_test, y_test, x_control_test, sensitive_attrs)
-            print "Solved !!!"
+            print ("Solved !!!")
             break
-        except Exception, e:
+        except Exception as e:
             if cnt % 4 == 0:
                 cons_params['tau'] *= 1.10
-            print str(e) + ", tau = " + str(cons_params['tau'])
+            print (str(e) + ", tau = " + str(cons_params['tau']))
             cnt += 1
             pass
 

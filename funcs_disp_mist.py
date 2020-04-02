@@ -317,7 +317,7 @@ def get_fpr_fnr_sensitive_features(y_true, y_pred, x_control, sensitive_attrs, v
         s_attr_to_fp_fn[s] = {}
         s_attr_vals = x_control_internal[s]
         if verbose == True:
-            print "||  s  || FPR. || FNR. ||"
+            print ("||  s  || FPR. || FNR. ||")
         for s_val in sorted(list(set(s_attr_vals))):
             s_attr_to_fp_fn[s][s_val] = {}
             y_true_local = y_true[s_attr_vals==s_val]
@@ -350,7 +350,7 @@ def get_fpr_fnr_sensitive_features(y_true, y_pred, x_control, sensitive_attrs, v
             if verbose == True:
                 if isinstance(s_val, float): # print the int value of the sensitive attr val
                     s_val = int(s_val)
-                print "||  %s  || %0.2f || %0.2f ||" % (s_val, fpr*100, fnr*100)
+                print ("||  %s  || %0.2f || %0.2f ||" % (s_val, fpr*100, fnr*100))
 
 
         return s_attr_to_fp_fn
@@ -477,7 +477,7 @@ def get_sensitive_attr_constraint_fpr_fnr_cov(model, x_arr, y_arr_true, y_arr_di
         cov_type_name = cons_type_to_name[cons_type]
         cov = cons_sum_dict[cons_type][1] - cons_sum_dict[cons_type][0]
         if verbose == True:
-            print "Covariance for type '%s' is: %0.7f" %(cov_type_name, cov)
+            print ("Covariance for type '%s' is: %0.7f" %(cov_type_name, cov))
 
     return cons_sum_dict
 
