@@ -37,8 +37,7 @@ from sklearn.tree.tree import BaseDecisionTree, DTYPE, DecisionTreeClassifier
 from sklearn.utils.validation import has_fit_parameter, check_is_fitted, check_array, check_X_y, check_random_state
 
 __all__ = [
-    'AdaFairNoCumul',
-    'AdaBoostRegressor',
+    'AdaFairNoCumul'
 ]
 
 
@@ -143,7 +142,7 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
 
         random_state = check_random_state(self.random_state)
         if self.debug:
-            print  "iteration, alpha , positives , negatives , dp , fp , dn , fn"
+            print  ("iteration, alpha , positives , negatives , dp , fp , dn , fn")
 
         old_weights_sum = np.sum(sample_weight)
         pos, neg, dp, fp, dn, fn = self.calculate_weights(X, y, sample_weight)
@@ -202,7 +201,7 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         best_theta = self.tuning_learners.index(min(self.tuning_learners))
         self.theta = best_theta + 1
         if self.debug:
-            print "best #weak learners = "+ str(self.theta )
+            print ("best #weak learners = "+ str(self.theta ))
         self.estimators_ = self.estimators_[:self.theta  ]
         self.estimator_alphas_ = self.estimator_alphas_[:self.theta  ]
 
