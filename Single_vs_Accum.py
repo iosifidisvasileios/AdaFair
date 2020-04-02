@@ -98,7 +98,7 @@ def run_eval(dataset, iterations):
 
     threads = []
 
-    print "elapsed time = " + str(time.time() - start)
+    print ("elapsed time = " + str(time.time() - start))
 
     results = []
     for suffix in suffixes:
