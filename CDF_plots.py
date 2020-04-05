@@ -1,18 +1,10 @@
-import random
-from collections import defaultdict
 import matplotlib
 import numpy
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.naive_bayes import GaussianNB
 
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 import sys
-
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.tree import DecisionTreeClassifier
 
 from AdaFair import AdaFair
 
@@ -21,9 +13,7 @@ sys.path.insert(0, 'equalized_odds_and_calibration-master')
 
 # import funcs_disp_mist as fdm
 
-import time
-from AdaCost import AdaCostClassifier
-from AdaFairNoCumul import AdaFairNoCumul
+from Competitors.AdaCost import AdaCostClassifier
 from load_kdd import load_kdd
 # from load_german import load_german
 from load_compas_data import load_compas
