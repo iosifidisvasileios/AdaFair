@@ -10,8 +10,6 @@ matplotlib.use('Agg')
 
 import sys
 
-from sklearn.model_selection import train_test_split
-
 from AdaFair import AdaFair
 
 sys.path.insert(0, 'DataPreprocessing')
@@ -19,7 +17,6 @@ sys.path.insert(0, 'DataPreprocessing')
 # import funcs_disp_mist as fdm
 
 import time
-from AdaCost import AdaCostClassifier
 from load_kdd import load_kdd
 from load_dutch_data import load_dutch_data
 # from load_german import load_german

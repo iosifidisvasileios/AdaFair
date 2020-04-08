@@ -93,7 +93,7 @@ def calculate_performance(data, labels, predictions, probs, saIndex, saValue):
     output["TNR_non_protected"] = tnr_non_protected
     return output
 
-def calculate_performance_SP(data, labels, predictions, probs, saIndex, saValue):
+def calculate_performance_SP(data, labels, predictions, saIndex, saValue):
     protected_pos = 0.
     protected_neg = 0.
     non_protected_pos = 0.
@@ -109,9 +109,6 @@ def calculate_performance_SP(data, labels, predictions, probs, saIndex, saValue)
     fp_non_protected = 0.
     fn_non_protected = 0.
 
-
-
-
     for idx, val in enumerate(data):
         # protrcted population
         if val[saIndex] == saValue:
@@ -119,8 +116,6 @@ def calculate_performance_SP(data, labels, predictions, probs, saIndex, saValue)
                 protected_pos += 1.
             else:
                 protected_neg += 1.
-
-
             # correctly classified
             if labels[idx] == predictions[idx]:
                 if labels[idx] == 1:

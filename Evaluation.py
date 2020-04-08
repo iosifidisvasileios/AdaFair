@@ -6,7 +6,7 @@ import os
 import matplotlib
 from sklearn.model_selection import ShuffleSplit
 
-from SMOTEBoost import SMOTEBoost
+from Competitors.SMOTEBoost import SMOTEBoost
 
 matplotlib.use('Agg')
 import sys
@@ -15,20 +15,17 @@ from AdaFair import AdaFair
 
 sys.path.insert(0, 'DataPreprocessing')
 
-import funcs_disp_mist as fdm
-
 import time
 
-from AdaCost import AdaCostClassifier
+from Competitors.AdaCost import AdaCostClassifier
 
-from load_dutch_data import load_dutch_data
 from load_compas_data import load_compas
 from load_adult import load_adult
 from load_kdd import load_kdd
 
 from load_bank import load_bank
 from my_useful_functions import calculate_performance, plot_my_results
-import utils as ut
+from Competitors import utils as ut, funcs_disp_mist as fdm
 
 
 class serialazible_list(object):
