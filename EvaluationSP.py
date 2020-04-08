@@ -1,16 +1,17 @@
 import warnings
 warnings.filterwarnings("ignore")
 
+import random
+from collections import defaultdict
 from multiprocessing import Process, Lock
 import pickle
 import os
 import matplotlib
-from sklearn.model_selection import StratifiedKFold
-import random
+from sklearn.model_selection import ShuffleSplit, StratifiedKFold
 
 from AdaFairSP import AdaFairSP
-from Competitors.SMOTEBoost import SMOTEBoost
-from Competitors.margin import boostingMarginAnalyzer
+from SMOTEBoost import SMOTEBoost
+from margin import *
 matplotlib.use('Agg')
 import sys
 
@@ -18,7 +19,7 @@ sys.path.insert(0, 'DataPreprocessing')
 
 import time
 
-from Competitors.AdaCost import AdaCostClassifier
+from AdaCost import AdaCostClassifier
 
 from load_dutch_data import load_dutch_data
 from load_compas_data import load_compas
@@ -54,7 +55,7 @@ def predict(clf, X_test, y_test, sa_index, p_Group):
     return calculate_performance_SP(X_test, y_test, y_pred_labels, y_pred_probs, sa_index, p_Group)
 
 def run_eval(dataset, iterations):
-    suffixes = [ 'Adaboost', 'AdaFair', 'SMOTEBoost', 'Fish et al.' ]
+    suffixes = [ 'Adaboost', 'AdaFair', 'SMOTEBoost' ]
 
     if dataset == "compass-gender":
         X, y, sa_index, p_Group, x_control = load_compas("sex")
@@ -74,6 +75,7 @@ def run_eval(dataset, iterations):
         X, y, sa_index, p_Group, x_control = load_diabetes()
     elif dataset == "kdd":
         X, y, sa_index, p_Group, x_control = load_kdd()
+
     else:
         exit(1)
     create_temp_files(dataset, suffixes)
@@ -92,8 +94,8 @@ def run_eval(dataset, iterations):
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
 
-            for proc in range(3, 4):
-                threads.append(Process(target=train_classifier, args=( X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc],proc, 100, 1)))
+            for proc in range(0, 3):
+                threads.append(Process(target=train_classifier, args=( X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc],proc, 200, 1)))
 
     for process in threads:
         process.start()
@@ -111,33 +113,44 @@ def run_eval(dataset, iterations):
     plot_my_results_sp(results, suffixes, "Images/StatisticalParity/" + dataset, dataset)
     delete_temp_files(dataset, suffixes)
 
+
+
+def boostLearner(train, protectedIndex, protectedValue):
+    marginAnalyzer = boostingMarginAnalyzer(train, protectedIndex, protectedValue)
+    shift = marginAnalyzer.optimalShift()
+    print('best shift is: %r' % (shift,))
+    return marginAnalyzer.conditionalShiftClassifier(shift)
+
+
+
 def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, mode, base_learners, c):
     if mode == 0:
         classifier = AdaCostClassifier(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB1")
     elif mode == 1:
         classifier = AdaFairSP(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2", c=c)
     elif mode == 2:
-        classifier = SMOTEBoost(n_estimators=base_learners,saIndex=sa_index,n_samples=10, saValue=p_Group,  CSB="CSB1")
+        classifier = SMOTEBoost(n_estimators=base_learners,saIndex=sa_index,n_samples=10, saValue=p_Group,  CSB="CSB1" )
     else:
         train=[]
         for i in range(len(X_train)):
               train.append((X_train[i],y_train[i]))
-
-        marginAnalyzer = boostingMarginAnalyzer(train, sa_index, p_Group, base_learners)
-        shift = marginAnalyzer.optimalShift()
-        classifier = marginAnalyzer.conditionalShiftClassifier(shift)
-
-    if mode in [0,1,2]:
+        classifier = boostLearner(train, sa_index, p_Group)
+    
+    if  mode in [0,1,2]:      
           classifier.fit(X_train, y_train)
+          y_pred_probs = classifier.predict_proba(X_test)[:, 1]
           y_pred_labels = classifier.predict(X_test)
+
     else:
         y_pred_labels=[classifier(x) for x in X_test]
+        y_pred_probs=[0 for i in y_pred_labels]
 
     mutex.acquire()
     infile = open(dataset, 'rb')
     dict_to_ram = pickle.load(infile)
     infile.close()
-    dict_to_ram.performance.append(calculate_performance_SP(X_test, y_test, y_pred_labels, sa_index, p_Group))
+    dict_to_ram.performance.append(
+        calculate_performance_SP(X_test, y_test, y_pred_labels, y_pred_probs, sa_index, p_Group))
     outfile = open(dataset, 'wb')
     pickle.dump(dict_to_ram, outfile)
     outfile.close()
