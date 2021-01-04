@@ -1,21 +1,19 @@
 import matplotlib
 import numpy
 
+from AdaFairSP import AdaFairSP
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 import sys
 
-from AdaFair import AdaFair
 
 sys.path.insert(0, 'DataPreprocessing')
-sys.path.insert(0, 'equalized_odds_and_calibration-master')
 
-# import funcs_disp_mist as fdm
 
 from Competitors.AdaCost import AdaCostClassifier
 from load_kdd import load_kdd
-# from load_german import load_german
 from load_compas_data import load_compas
 from load_adult import load_adult
 from load_bank import load_bank
@@ -36,7 +34,6 @@ def run_eval(dataset):
     else:
         exit(1)
 
-
     base_learners = 200
     adaboost, adaboost_weights, init_weights = train_classifier(X,  y, sa_index, p_Group, 0, base_learners )
     csb1, csb1_weights, temp= train_classifier(X, y, sa_index, p_Group, 1, base_learners )
@@ -55,12 +52,10 @@ def run_eval(dataset):
     adaboost_positives = adaboost[y==1]
     adaboost_negatives = adaboost[y==-1]
 
-
     num_bins = 50
     fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(12,3))
     # fig, (ax1, ax2, ax3) = plt.subplots(nrows=1, ncols=3, figsize=(14,3))
     plt.rcParams.update({'font.size': 11})
-
 
     ax1.set_title( "Positive CDF")
     ax1.grid(True)
@@ -77,13 +72,9 @@ def run_eval(dataset):
     ax1.plot(bin_edges_csb2_positives[1:], cdf_csb2_positives / cdf_csb2_positives[-1], c='red', linestyle='--', label='AdaFair')
     ax1.legend(loc='best')
     ax1.set_xlabel("Margin")
-
     ax1.set_ylabel("Cumulative Distribution")
     ax1.axhline(0, color='black')
     ax1.axvline(0, color='black')
-
-
-
     ax2.grid(True)
 
     ax2.axhline(0, color='black')
@@ -106,20 +97,17 @@ def run_eval(dataset):
     ax2.legend(loc='best')
 
     fig.tight_layout()
-
     plt.show()
-
-
     plt.legend(loc='best',fancybox=True, framealpha=0.2)
-    plt.savefig("Images/cdf_" +dataset  + ".png")
+    plt.savefig("Images/cdf_" +dataset  + "_sp.png")
 
 def train_classifier(X_train, y_train, sa_index, p_Group, mode, base_learners):
     if mode == 0:
         classifier = AdaCostClassifier(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB1", debug=True)
     elif mode == 1:
-        classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB1", debug=True, c=1)
+        classifier = AdaFairSP(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB1", debug=True, c=1)
     elif mode == 2:
-        classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2", debug=True, c=1)
+        classifier = AdaFairSP(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2", debug=True, c=1)
 
     classifier.fit(X_train, y_train)
 
@@ -132,6 +120,6 @@ def main(dataset):
 
 if __name__ == '__main__':
     main("compass-gender")
-    # main("adult-gender")
-    # main("bank")
-    # main("kdd")
+    main("adult-gender")
+    main("bank")
+    main("kdd")

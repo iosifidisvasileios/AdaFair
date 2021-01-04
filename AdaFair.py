@@ -30,9 +30,13 @@ import sklearn
 from sklearn.base import is_classifier, ClassifierMixin, is_regressor
 from sklearn.ensemble import BaseEnsemble
 from sklearn.ensemble.forest import BaseForest
-from sklearn.externals import six
-from sklearn.metrics import accuracy_score
+# from sklearn.externals import six
+import six
+import sys
+sys.modules['sklearn.externals.six'] = six
+from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.metrics import r2_score
+from sklearn.model_selection import train_test_split
 from sklearn.tree.tree import BaseDecisionTree, DTYPE, DecisionTreeClassifier
 from sklearn.utils.validation import has_fit_parameter, check_is_fitted, check_array, check_X_y, check_random_state
 
@@ -114,6 +118,11 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         X, y = check_X_y(X, y, accept_sparse=accept_sparse, dtype=dtype,
                          y_numeric=is_regressor(self))
 
+        self.X_valid = self.y_valid = None
+        if self.use_validation:
+            X, self.X_valid, y, self.y_valid = train_test_split(X, y, test_size = 0.3, shuffle=True, stratify=y)
+
+
         if sample_weight is None:
             # Initialize weights to 1 / n_samples
             sample_weight = np.empty(X.shape[0], dtype=np.float64)
@@ -132,9 +141,6 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         # Check parameters
         self._validate_estimator()
 
-        if self.debug:
-            self.conf_scores = []
-
         # Clear any previous fit results
         self.estimators_ = []
 
@@ -142,16 +148,23 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         self.estimator_fairness_ = np.ones(self.n_estimators, dtype=np.float64)
 
         random_state = check_random_state(self.random_state)
-        if self.debug:
-            print  ("iteration, alpha , positives , negatives , dp , fp , dn , fn")
+        # if self.debug:
+        #     pos, neg, dp, fp, dn, fn = self.calculate_weights(X, y, sample_weight)
+        #     print  ("iteration, alpha , positives , negatives , dp , fp , dn , fn")
 
         old_weights_sum = np.sum(sample_weight)
-        pos, neg, dp, fp, dn, fn = self.calculate_weights(X, y, sample_weight)
+        self.predictions_array = np.zeros([X.shape[0], 2])
+
+        if self.use_validation:
+            self.predictions_array_valid = np.zeros([self.X_valid.shape[0], 2])
 
         if self.debug:
-            self.weight_list.append(
-                'init' + "," + str(0) + "," + str(pos) + ", " + str(neg) + ", " + str(dp) + ", " + str(
-                    fp) + ", " + str(dn) + ", " + str(fn))
+            self.predictions_array_test = np.zeros([self.X_test.shape[0], 2])
+
+        # if self.debug:
+        #     self.weight_list.append(
+        #         'init' + "," + str(0) + "," + str(pos) + ", " + str(neg) + ", " + str(dp) + ", " + str(
+        #             fp) + ", " + str(dn) + ", " + str(fn))
 
         for iboost in range(self.n_estimators):
             # Boosting step
@@ -164,10 +177,8 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             # Early termination
             if sample_weight is None:
                 break
-
             self.tuning_learners.append(self.c* balanced_error + (1 - self.c)*cumulative_error + fairness)
-
-            # self.estimator_alphas_[iboost] = alpha
+            # print (iboost, balanced_error, cumulative_error, fairness)
 
             # Stop if error is zero
             if error == 0.5:
@@ -184,30 +195,28 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
                 # Normalize
                 sample_weight *= multiplier
 
-
-            pos, neg, dp,fp,dn,fn = self.calculate_weights(X, y, sample_weight)
-
-            if self.debug:
-                self.weight_list.append(str(iboost) + "," + str(alpha) + "," + str(pos) + ", " + str(neg) + ", " + str(dp) + ", " + str(fp) + ", " + str(dn) + ", " + str(fn))
-
-            self.W_pos += pos/self.n_estimators
-            self.W_neg += neg/self.n_estimators
-            self.W_dp += dp/self.n_estimators
-            self.W_fp += fp/self.n_estimators
-            self.W_dn += dn/self.n_estimators
-            self.W_fn += fn/self.n_estimators
+            #
+            #
+            # if self.debug:
+            #     pos, neg, dp,fp,dn,fn = self.calculate_weights(X, y, sample_weight)
+            #     self.weight_list.append(str(iboost) + "," + str(alpha) + "," + str(pos) + ", " + str(neg) + ", " + str(dp) + ", " + str(fp) + ", " + str(dn) + ", " + str(fn))
+            #
+            #     self.W_pos += pos/self.n_estimators
+            #     self.W_neg += neg/self.n_estimators
+            #     self.W_dp += dp/self.n_estimators
+            #     self.W_fp += fp/self.n_estimators
+            #     self.W_dn += dn/self.n_estimators
+            #     self.W_fn += fn/self.n_estimators
 
             old_weights_sum = np.sum(sample_weight)
 
         best_theta = self.tuning_learners.index(min(self.tuning_learners))
         self.theta = best_theta + 1
-        if self.debug:
-            print ("best #weak learners = "+ str(self.theta ))
         self.estimators_ = self.estimators_[:self.theta  ]
-        self.estimator_alphas_ = self.estimator_alphas_[:self.theta  ]
+        self.estimator_alphas_ = self.estimator_alphas_[:self.theta]
 
-        if self.debug:
-            self.get_confidence_scores(X)
+        # if self.debug:
+        #     self.get_confidence_scores(X)
 
         return self
 
@@ -462,11 +471,13 @@ class AdaFair(BaseWeightBoosting, ClassifierMixin):
                  base_estimator=None,
                  n_estimators=50,
                  learning_rate=1.,
+                 cumul=True,
                  algorithm='SAMME',
                  random_state=None,
                  saIndex=None,saValue=None,
                  debug=False, CSB="CSB2",
-                 X_test=None, y_test=None, c = 1):
+                 X_test=None, y_test=None, c = 1, use_validation=False, proba=False
+                 ):
 
         super(AdaFair, self).__init__(
             base_estimator=base_estimator,
@@ -476,7 +487,7 @@ class AdaFair(BaseWeightBoosting, ClassifierMixin):
 
         self.cost_protected_positive = 1
         self.cost_non_protected_positive = 1
-
+        self.cumul = cumul
         self.cost_protected_negative = 1
         self.cost_non_protected_negative = 1
 
@@ -485,6 +496,8 @@ class AdaFair(BaseWeightBoosting, ClassifierMixin):
         self.saValue = saValue
         self.algorithm = algorithm
 
+        self.use_validation = use_validation
+        self.use_proba = proba
         self.costs = []
 
         self.debug = debug
@@ -670,7 +683,6 @@ class AdaFair(BaseWeightBoosting, ClassifierMixin):
         y_predict = estimator.predict(X)
         proba = estimator.predict_proba(X)
 
-
         if iboost == 0:
             self.classes_ = getattr(estimator, 'classes_', None)
             self.n_classes_ = len(self.classes_)
@@ -684,9 +696,7 @@ class AdaFair(BaseWeightBoosting, ClassifierMixin):
         # Stop if classification is perfect
         if estimator_error <= 0:
             return sample_weight, 1., 0.
-
         n_classes = self.n_classes_
-
         # Stop if the error is at least as bad as random guessing
         if estimator_error >= 1. - (1. / n_classes):
             self.estimators_.pop(-1)
@@ -696,26 +706,46 @@ class AdaFair(BaseWeightBoosting, ClassifierMixin):
                                  'can not be fit.')
             return None, None, None
 
-        # Boost weight using multi-class AdaBoost SAMME alg
-        alpha = self.learning_rate * (
-            np.log((1. - estimator_error) / estimator_error) +
-            np.log(n_classes - 1.))
+        alpha = 1 * (
+                np.log((1. - estimator_error) / estimator_error) +
+                np.log(n_classes - 1.))
 
-        incorrect = y_predict != y
         self.estimator_alphas_[iboost] = alpha
+        self.predictions_array += (y_predict == self.classes_[:, np.newaxis]).T * alpha
 
-        # Error fraction
-        estimator_error = np.mean(np.average(incorrect, weights=sample_weight, axis=0))
+        if self.use_validation:
+            y_valid_predict = estimator.predict(self.X_valid)
+            self.predictions_array_valid += (y_valid_predict == self.classes_[:, np.newaxis]).T * alpha
 
-        if iboost != 0:
-            cumulative_balanced_error = 1 - sklearn.metrics.balanced_accuracy_score(y, self.predict(X))
-            fairness = self.calculate_fairness(X, y, self.predict(X))
-            cumulative_error = 1 - sklearn.metrics.accuracy_score(y, self.predict(X))
+            if iboost != 0:
+                if self.cumul:
+                    fairness = self.calculate_fairness(self.X_valid, self.y_valid, self.classes_.take(np.argmax(self.predictions_array_valid, axis=1)))
+                else:
+                    fairness = self.calculate_fairness(self.X_valid, self.y_valid, y_valid_predict)
+            else:
+                fairness = 1
+
+            tn, fp, fn, tp = confusion_matrix(self.y_valid, self.classes_.take(np.argmax(self.predictions_array_valid, axis=1), axis=0),
+                                              labels=[-1, 1]).ravel()
+            TPR = (float(tp)) / (tp + fn)
+            TNR = (float(tn)) / (tn + fp)
+            cumulative_balanced_error = 1 - (TPR + TNR) / 2
+            cumulative_error = 1 - (float(tp) + float(tn)) / (tp + tn + fp + fn)
         else:
-            cumulative_error = estimator_error
-            cumulative_balanced_error = 1 - sklearn.metrics.balanced_accuracy_score(y, y_predict)
-            fairness = 1
+            if iboost != 0:
+                if self.cumul:
+                    fairness = self.calculate_fairness(X, y, self.classes_.take(np.argmax(self.predictions_array, axis=1)))
+                else:
+                    fairness = self.calculate_fairness(X, y, y_predict)
+            else:
+                fairness = 1
 
+            tn, fp, fn, tp = confusion_matrix(y, self.classes_.take(np.argmax(self.predictions_array, axis=1), axis=0),
+                                              labels=[-1, 1]).ravel()
+            TPR = (float(tp)) / (tp + fn)
+            TNR = (float(tn)) / (tn + fp)
+            cumulative_balanced_error = 1 - (TPR + TNR) / 2
+            cumulative_error = 1 - (float(tp) + float(tn)) / (tp + tn + fp + fn)
 
         if not iboost == self.n_estimators - 1:
             for idx, row in enumerate(sample_weight):
@@ -742,26 +772,22 @@ class AdaFair(BaseWeightBoosting, ClassifierMixin):
                             sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha * max(proba[idx][0], proba[idx][1]))
                         elif self.csb == "CSB1":
                             sample_weight[idx] *= self.cost_non_protected_negative * np.exp( alpha )
-        if self.debug:
-            y_predict = self.predict(X)
-            incorrect = y_predict != y
-            train_error = np.mean(np.average(incorrect, axis=0))
-            train_bal_error = 1 - sklearn.metrics.balanced_accuracy_score(y, y_predict)
-            train_fairness = self.measure_fairness_for_visualization(X,y,y_predict)
 
-            test_error= 0
-            test_bal_error= 0
-            test_fairness= 0
-            if self.X_test is not None:
-                y_predict = self.predict(self.X_test)
-                incorrect = y_predict != self.y_test
-                test_error = np.mean(np.average(incorrect, axis=0))
-                test_bal_error = 1 - sklearn.metrics.balanced_accuracy_score(self.y_test, y_predict)
-                test_fairness = self.measure_fairness_for_visualization(self.X_test,self.y_test,y_predict)
+        if self.debug and self.X_test is not None:
 
-            self.objective.append(train_error * (1-self.c) + train_bal_error*self.c + train_fairness)
-            self.performance.append(str(iboost) + "," + str(train_error) + ", " + str(train_bal_error) + ", " + str(train_fairness) + "," + str(test_error) + ", " + str(test_bal_error) + ", " + str(test_fairness))
-            print (str(iboost) + "," + str(train_error) + ", " + str(train_bal_error) + ", " + str(train_fairness) + ","+ str(test_error) + ", " + str(test_bal_error)+ ", " + str(test_fairness))
+            y_valid_predict = estimator.predict(self.X_test)
+            self.predictions_array_test += (y_valid_predict == self.classes_[:, np.newaxis]).T * alpha
+
+            tn, fp, fn, tp = confusion_matrix(self.y_test, self.classes_.take(np.argmax(self.predictions_array_test, axis=1), axis=0),
+                                              labels=[-1, 1]).ravel()
+            TPR = (float(tp)) / (tp + fn)
+            TNR = (float(tn)) / (tn + fp)
+            test_cumulative_balanced_error = 1 - (TPR + TNR) / 2
+            test_cumulative_error = 1 - (float(tp) + float(tn)) / (tp + tn + fp + fn)
+            test_fairness = self.measure_fairness_for_visualization(self.X_test,self.y_test,self.classes_.take(np.argmax(self.predictions_array_test, axis=1)))
+            self.performance.append((cumulative_balanced_error, cumulative_error, fairness, test_cumulative_balanced_error, test_cumulative_error, test_fairness))
+            self.objective.append(cumulative_error * (1-self.c) + cumulative_balanced_error*self.c + fairness)
+            print(iboost)
 
         return sample_weight, alpha, estimator_error, fairness, cumulative_balanced_error, cumulative_error
 
@@ -821,11 +847,29 @@ class AdaFair(BaseWeightBoosting, ClassifierMixin):
         n_classes = self.n_classes_
         classes = self.classes_[:, np.newaxis]
 
+        # pred_prob = sum(estimator.predict_proba(X) * w for estimator, w in zip(self.estimators_, self.estimator_alphas_))
+        # pred_orig = sum((estimator.predict(X) == classes).T * w for estimator, w in zip(self.estimators_, self.estimator_alphas_))
+        #
+        # print ((self.estimators_[0].predict(X) == classes).T * self.estimator_alphas_[0])
+        # print (self.estimators_[0].predict_proba(X)* self.estimator_alphas_[0])
+        #
+        #
+        #
+        # pred_prob /= self.estimator_alphas_.sum()
+        # pred_orig /= self.estimator_alphas_.sum()
+        #
+        # pred_prob[:, 0] *= -1
+        # pred_orig[:, 0] *= -1
+        # print(sum(pred_prob.sum(axis=1) - pred_orig.sum(axis=1)))
 
-
-        pred = sum((estimator.predict(X)== classes).T * w  for estimator, w in zip(self.estimators_, self.estimator_alphas_))
-            # pred = sum(estimator.predict_proba(X) * w for estimator, w,  in zip(self.estimators_, self.estimator_alphas_))
+        if self.use_proba:
+            pred = sum(estimator.predict_proba(X) * w  for estimator, w in zip(self.estimators_, self.estimator_alphas_))
+        else:
+            pred = sum((estimator.predict(X)== classes).T * w  for estimator, w in zip(self.estimators_, self.estimator_alphas_))
         pred /= self.estimator_alphas_.sum()
+
+
+
         if n_classes == 2:
             pred[:, 0] *= -1
             return pred.sum(axis=1)

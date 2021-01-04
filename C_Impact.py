@@ -4,7 +4,7 @@ import pickle
 import os
 import matplotlib
 import numpy
-from sklearn.model_selection import ShuffleSplit
+from sklearn.model_selection import ShuffleSplit, StratifiedShuffleSplit
 
 matplotlib.use('Agg')
 
@@ -45,7 +45,7 @@ def create_temp_files(dataset, suffixes,steps):
 
 def delete_temp_files(dataset, suffixes):
     for suffix in suffixes:
-        os.remove(dataset + suffix)
+        os.remove(dataset + suffix + "_dm")
 
 
 
@@ -71,7 +71,7 @@ def run_eval(dataset, iterations):
     suffixes = ['AdaFair NoConf.', 'AdaFair']
     random.seed(int(time.time()))
 
-    base_learners = 200
+    base_learners = 500
     steps = numpy.arange(0, 1.001, step=0.2)
 
     create_temp_files(dataset, suffixes,steps)
@@ -83,14 +83,16 @@ def run_eval(dataset, iterations):
     for iterations in range (0,iterations):
         start = time.time()
 
-        sss = ShuffleSplit(n_splits=2, test_size=0.5)
+        sss = StratifiedShuffleSplit(n_splits=1, test_size=.5, random_state=iterations)
         for train_index, test_index in sss.split(X, y):
 
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
 
             for c in steps:
-                threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[1], mutex[1], 2, base_learners, c)))
+                threads.append(Process(target=train_classifier, args=(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[1], mutex[1], base_learners, c)))
+
+            break
 
         for process in threads:
             process.start()
@@ -104,32 +106,28 @@ def run_eval(dataset, iterations):
 
     results = []
     for suffix in suffixes:
-        infile = open(dataset + suffix, 'rb')
+        infile = open(dataset + suffix + "_dm", 'rb')
         temp_buffer = pickle.load(infile)
         results.append(temp_buffer.performance)
         infile.close()
-    plot_results_of_c_impact(results[0], results[1], steps, "Images/", dataset)
+    plot_results_of_c_impact(results[0], results[1], steps, "Images/Impact_c/", dataset)
     delete_temp_files(dataset, suffixes)
 
 
 
-def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, mode, base_learners, c):
-    if mode == 1:
-        classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB1", c=c)
-    elif mode == 2:
-        classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2", c=c)
-
+def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, base_learners, c):
+    classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB='CSB1', c=c)
     classifier.fit(X_train, y_train)
 
     y_pred_probs = classifier.predict_proba(X_test)[:, 1]
     y_pred_labels = classifier.predict(X_test)
 
     mutex.acquire()
-    infile = open(dataset, 'rb')
+    infile = open(dataset + "_dm", 'rb')
     dict_to_ram = pickle.load(infile)
     infile.close()
     dict_to_ram.performance[c].append(calculate_performance(X_test, y_test, y_pred_labels, y_pred_probs, sa_index, p_Group))
-    outfile = open(dataset, 'wb')
+    outfile = open(dataset + "_dm", 'wb')
     pickle.dump(dict_to_ram, outfile)
     outfile.close()
     mutex.release()
@@ -142,8 +140,8 @@ def main(dataset, iterations):
 if __name__ == '__main__':
     # run_eval(sys.argv[1], int(sys.argv[2]))
     main("compass-gender",10)
-    # main("adult-gender", 10)
-    # main("bank", 10)
-    # main("kdd", 10)
+    main("adult-gender", 10)
+    main("bank", 10)
+    main("kdd", 10)
 
 

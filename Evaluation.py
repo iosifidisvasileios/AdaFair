@@ -1,12 +1,13 @@
+import warnings
+warnings.filterwarnings("ignore")
+import copy
 import random
 from collections import defaultdict
 from multiprocessing import Process, Lock
 import pickle
 import os
 import matplotlib
-from sklearn.model_selection import ShuffleSplit
-
-from Competitors.SMOTEBoost import SMOTEBoost
+from sklearn.model_selection import ShuffleSplit, train_test_split, StratifiedShuffleSplit
 
 matplotlib.use('Agg')
 import sys
@@ -25,7 +26,7 @@ from load_kdd import load_kdd
 
 from load_bank import load_bank
 from my_useful_functions import calculate_performance, plot_my_results
-from Competitors import utils as ut, funcs_disp_mist as fdm
+# from Competitors import utils as ut, funcs_disp_mist as fdm
 
 
 class serialazible_list(object):
@@ -55,7 +56,8 @@ def predict(clf, X_test, y_test, sa_index, p_Group):
 
 
 def run_eval(dataset, iterations):
-    suffixes = ['Zafar et al.', 'Adaboost', 'AdaFair', 'SMOTEBoost' ]
+    # suffixes = ['Zafar et al.', 'Adaboost', 'AdaFair', 'SMOTEBoost' ]
+    suffixes = ['Zafar et al.', 'Adaboost', 'AdaFair CSB2', 'AdaFair CSB1' ]
 
     if dataset == "compass-gender":
         X, y, sa_index, p_Group, x_control = load_compas("sex")
@@ -81,7 +83,8 @@ def run_eval(dataset, iterations):
     sensitive_attrs = x_control.keys()
     loss_function = "logreg"
     EPS = 1e-6
-    sensitive_attrs_to_cov_thresh = {sensitive_attrs[0]: {0: {0: 0, 1: 0}, 1: {0: 0, 1: 0}, 2: {0: 0, 1: 0}}}
+    # sensitive_attrs_to_cov_thresh = {sensitive_attrs[0]: {0: {0: 0, 1: 0}, 1: {0: 0, 1: 0}, 2: {0: 0, 1: 0}}}
+    sensitive_attrs_to_cov_thresh = {0: {0: {0: 0, 1: 0}, 1: {0: 0, 1: 0}, 2: {0: 0, 1: 0}}}
     cons_params = {"cons_type": cons_type, "tau": tau, "mu": mu,
                    "sensitive_attrs_to_cov_thresh": sensitive_attrs_to_cov_thresh}
 
@@ -94,36 +97,41 @@ def run_eval(dataset, iterations):
 
     for iter in range(0, iterations):
 
-        sss = ShuffleSplit(n_splits=1, test_size=0.5)
+        sss = StratifiedShuffleSplit(n_splits=1, test_size=0.5)
         for train_index, test_index in sss.split(X, y):
 
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
 
             for proc in range(0, 4):
-                if proc != 2 :
+                if proc < 3 :
                     time.sleep(1)
                     continue
 
                 if proc > 0:
-                    threads.append(Process(target=train_classifier, args=( X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc],proc, 200, 1)))
+                    threads.append(Process(target=train_classifier, args=( copy.deepcopy(X_train),
+                                                                           X_test, copy.deepcopy(y_train),
+                                                                           y_test, sa_index, p_Group,
+                                                                           dataset + suffixes[proc],
+                                                                           mutex[proc],proc, 500, 1)))
 
-                elif proc == 0:
-                    temp_x_control_train = defaultdict(list)
-                    temp_x_control_test = defaultdict(list)
-
-                    temp_x_control_train[sensitive_attrs[0]] = x_control[sensitive_attrs[0]][train_index]
-                    temp_x_control_test[sensitive_attrs[0]] = x_control[sensitive_attrs[0]][test_index]
-
-                    x_zafar_train, y_zafar_train, x_control_train = ut.conversion(X[train_index], y[train_index],dict(temp_x_control_train), 1)
-
-                    x_zafar_test, y_zafar_test, x_control_test = ut.conversion(X[test_index], y[test_index],dict(temp_x_control_test), 1)
-
-                    threads.append(Process(target=train_zafar, args=(x_zafar_train, y_zafar_train, x_control_train,
-                                                                     x_zafar_test, y_zafar_test, x_control_test,
-                                                                     cons_params, loss_function, EPS,
-                                                                     dataset + suffixes[proc], mutex[proc],
-                                                                     sensitive_attrs)))
+                # elif proc == 0:
+                #     temp_x_control_train = defaultdict(list)
+                #     temp_x_control_test = defaultdict(list)
+                #
+                #     temp_x_control_train[sensitive_attrs[0]] = x_control[sensitive_attrs[0]][train_index]
+                #     temp_x_control_test[sensitive_attrs[0]] = x_control[sensitive_attrs[0]][test_index]
+                #
+                #     x_zafar_train, y_zafar_train, x_control_train = ut.conversion(X[train_index], y[train_index],dict(temp_x_control_train), 1)
+                #
+                #     x_zafar_test, y_zafar_test, x_control_test = ut.conversion(X[test_index], y[test_index],dict(temp_x_control_test), 1)
+                #
+                #     threads.append(Process(target=train_zafar, args=(x_zafar_train, y_zafar_train, x_control_train,
+                #                                                      x_zafar_test, y_zafar_test, x_control_test,
+                #                                                      cons_params, loss_function, EPS,
+                #                                                      dataset + suffixes[proc], mutex[proc],
+                #                                                      sensitive_attrs)))
+            break
 
     for process in threads:
         process.start()
@@ -142,53 +150,53 @@ def run_eval(dataset, iterations):
 
     plot_my_results(results, suffixes, "Images/" + dataset, dataset)
     delete_temp_files(dataset, suffixes)
-
-def train_zafar(x_train, y_train, x_control_train, x_test, y_test, x_control_test, cons_params, loss_function, EPS, dataset, mutex, sensitive_attrs):
-
-    cnt = 1
-    while True:
-        if cnt > 41:
-            return
-        try:
-            w = fdm.train_model_disp_mist(x_train, y_train, x_control_train, loss_function, EPS, cons_params)
-            rates, acc, balanced_acc,_ = fdm.get_clf_stats(w, x_train, y_train, x_control_train, x_test, y_test, x_control_test, sensitive_attrs)
-            print ("Solved !!!")
-            break
-        except Exception as e:
-            if cnt % 4 == 0:
-                cons_params['tau'] *= 1.10
-            print (str(e) + ", tau = " + str(cons_params['tau']))
-            cnt += 1
-            pass
-
-    results = dict()
-
-    results["balanced_accuracy"] = balanced_acc
-    results["accuracy"] = acc
-    results["TPR_protected"] = rates["TPR_Protected"]
-    results["TPR_non_protected"] = rates["TPR_Non_Protected"]
-    results["TNR_protected"] = rates["TNR_Protected"]
-    results["TNR_non_protected"] = rates["TNR_Non_Protected"]
-    results["fairness"] = abs(rates["TPR_Protected"] - rates["TPR_Non_Protected"]) + abs(rates["TNR_Protected"] - rates["TNR_Non_Protected"])
-
-    mutex.acquire()
-    infile = open(dataset, 'rb')
-    dict_to_ram = pickle.load(infile)
-    infile.close()
-    dict_to_ram.performance.append(results)
-    outfile = open(dataset, 'wb')
-    pickle.dump(dict_to_ram, outfile)
-    outfile.close()
-    mutex.release()
+#
+# def train_zafar(x_train, y_train, x_control_train, x_test, y_test, x_control_test, cons_params, loss_function, EPS, dataset, mutex, sensitive_attrs):
+#
+#     cnt = 1
+#     while True:
+#         if cnt > 41:
+#             return
+#         try:
+#             w = fdm.train_model_disp_mist(x_train, y_train, x_control_train, loss_function, EPS, cons_params)
+#             rates, acc, balanced_acc,_ = fdm.get_clf_stats(w, x_train, y_train, x_control_train, x_test, y_test, x_control_test, sensitive_attrs)
+#             print ("Solved !!!")
+#             break
+#         except Exception as e:
+#             if cnt % 4 == 0:
+#                 cons_params['tau'] *= 1.10
+#             print (str(e) + ", tau = " + str(cons_params['tau']))
+#             cnt += 1
+#             pass
+#
+#     results = dict()
+#
+#     results["balanced_accuracy"] = balanced_acc
+#     results["accuracy"] = acc
+#     results["TPR_protected"] = rates["TPR_Protected"]
+#     results["TPR_non_protected"] = rates["TPR_Non_Protected"]
+#     results["TNR_protected"] = rates["TNR_Protected"]
+#     results["TNR_non_protected"] = rates["TNR_Non_Protected"]
+#     results["fairness"] = abs(rates["TPR_Protected"] - rates["TPR_Non_Protected"]) + abs(rates["TNR_Protected"] - rates["TNR_Non_Protected"])
+#
+#     mutex.acquire()
+#     infile = open(dataset, 'rb')
+#     dict_to_ram = pickle.load(infile)
+#     infile.close()
+#     dict_to_ram.performance.append(results)
+#     outfile = open(dataset, 'wb')
+#     pickle.dump(dict_to_ram, outfile)
+#     outfile.close()
+#     mutex.release()
 
 
 def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, mode, base_learners, c):
     if mode == 1:
         classifier = AdaCostClassifier(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB1")
     elif mode == 2:
-        classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2", c=c)
+        classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2", c=c, use_validation=False)
     elif mode == 3:
-        classifier = SMOTEBoost(n_estimators=base_learners,saIndex=sa_index,n_samples=2, saValue=p_Group,  CSB="CSB1" )
+        classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB1", c=c, use_validation=False)
     classifier.fit(X_train, y_train)
 
     y_pred_probs = classifier.predict_proba(X_test)[:, 1]
@@ -210,6 +218,6 @@ if __name__ == '__main__':
     # run_eval(sys.argv[1], int(sys.argv[2]))
     # run_eval("compass-race", 10)
     run_eval("compass-gender", 10)
-    # run_eval("adult-gender", 10)
-    # run_eval("bank", 10)
-    # run_eval("kdd", 10)
+    run_eval("adult-gender", 10)
+    run_eval("bank", 10)
+    run_eval("kdd", 10)

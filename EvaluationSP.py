@@ -7,11 +7,11 @@ from multiprocessing import Process, Lock
 import pickle
 import os
 import matplotlib
-from sklearn.model_selection import ShuffleSplit, StratifiedKFold
+from sklearn.model_selection import ShuffleSplit, StratifiedKFold, StratifiedShuffleSplit
 
 from AdaFairSP import AdaFairSP
-from SMOTEBoost import SMOTEBoost
-from margin import *
+from Competitors.SMOTEBoost import SMOTEBoost
+from Competitors.boost_margin import marginAnalyzer
 matplotlib.use('Agg')
 import sys
 
@@ -19,16 +19,16 @@ sys.path.insert(0, 'DataPreprocessing')
 
 import time
 
-from AdaCost import AdaCostClassifier
+from Competitors.AdaCost import AdaCostClassifier
 
-from load_dutch_data import load_dutch_data
-from load_compas_data import load_compas
-from load_adult import load_adult
-from load_diabetes import load_diabetes
-from load_credit import load_credit
-from load_kdd import load_kdd
+from DataPreprocessing.load_dutch_data import load_dutch_data
+from DataPreprocessing.load_compas_data import load_compas
+from DataPreprocessing.load_adult import load_adult
+from DataPreprocessing.load_diabetes import load_diabetes
+from DataPreprocessing.load_credit import load_credit
+from DataPreprocessing.load_kdd import load_kdd
 
-from load_bank import load_bank
+from DataPreprocessing.load_bank import load_bank
 from my_useful_functions import calculate_performance_SP, plot_my_results_sp
 
 
@@ -55,7 +55,7 @@ def predict(clf, X_test, y_test, sa_index, p_Group):
     return calculate_performance_SP(X_test, y_test, y_pred_labels, y_pred_probs, sa_index, p_Group)
 
 def run_eval(dataset, iterations):
-    suffixes = [ 'Adaboost', 'AdaFair', 'SMOTEBoost' ]
+    suffixes = [ 'Adaboost', 'AdaFair', 'SMOTEBoost', 'Fish et al.' ]
 
     if dataset == "compass-gender":
         X, y, sa_index, p_Group, x_control = load_compas("sex")
@@ -88,15 +88,16 @@ def run_eval(dataset, iterations):
 
     for iter in range(0, iterations):
 
-        sss = StratifiedKFold(n_splits=2, shuffle=True, random_state=int(time.time()))
+        sss = StratifiedShuffleSplit(n_splits=1, test_size=.5, random_state=iter)
         for train_index, test_index in sss.split(X, y):
 
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
 
-            for proc in range(0, 3):
-                threads.append(Process(target=train_classifier, args=( X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc],proc, 200, 1)))
-
+            # for proc in range(0, 4):
+            #     threads.append(Process(target=train_classifier, args=( X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[proc], mutex[proc],proc, 200, 1, dataset)))
+            threads.append(Process(target=train_classifier, args=( X_train, X_test, y_train, y_test, sa_index, p_Group, dataset + suffixes[1], mutex[1],1, 500, 1, dataset)))
+            break
     for process in threads:
         process.start()
 
@@ -115,42 +116,39 @@ def run_eval(dataset, iterations):
 
 
 
-def boostLearner(train, protectedIndex, protectedValue):
-    marginAnalyzer = boostingMarginAnalyzer(train, protectedIndex, protectedValue)
-    shift = marginAnalyzer.optimalShift()
-    print('best shift is: %r' % (shift,))
-    return marginAnalyzer.conditionalShiftClassifier(shift)
 
-
-
-def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, mode, base_learners, c):
+def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, mode, base_learners, c, dataset_name):
     if mode == 0:
         classifier = AdaCostClassifier(saIndex=sa_index, saValue=p_Group, n_estimators=base_learners, CSB="CSB1")
     elif mode == 1:
-        classifier = AdaFairSP(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2", c=c)
+        classifier = AdaFairSP(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB1", c=c)
     elif mode == 2:
-        classifier = SMOTEBoost(n_estimators=base_learners,saIndex=sa_index,n_samples=10, saValue=p_Group,  CSB="CSB1" )
+        if dataset_name == 'adult-gender' or dataset == 'bank':
+            samples = 100
+        elif dataset_name == 'compass-gender':
+            samples = 2
+        else:
+            samples = 500
+        classifier = SMOTEBoost(n_estimators=base_learners,saIndex=sa_index, n_samples=samples, saValue=p_Group,  CSB="CSB1" )
     else:
-        train=[]
-        for i in range(len(X_train)):
-              train.append((X_train[i],y_train[i]))
-        classifier = boostLearner(train, sa_index, p_Group)
+        classifier=marginAnalyzer(X_train,y_train,sa_index=sa_index,p_Group=p_Group,numRounds=200)
     
     if  mode in [0,1,2]:      
           classifier.fit(X_train, y_train)
-          y_pred_probs = classifier.predict_proba(X_test)[:, 1]
+          # y_pred_probs = classifier.predict_proba(X_test)[:, 1]
           y_pred_labels = classifier.predict(X_test)
 
     else:
-        y_pred_labels=[classifier(x) for x in X_test]
-        y_pred_probs=[0 for i in y_pred_labels]
+        y_pred_labels=classifier.pred(X_test)
+        # y_pred_probs=classifier.margin(classifier.clf,X_test)
+        # y_pred_probs=[abs(prob) for prob in y_pred_probs]
 
     mutex.acquire()
     infile = open(dataset, 'rb')
     dict_to_ram = pickle.load(infile)
     infile.close()
     dict_to_ram.performance.append(
-        calculate_performance_SP(X_test, y_test, y_pred_labels, y_pred_probs, sa_index, p_Group))
+        calculate_performance_SP(X_test, y_test, y_pred_labels, sa_index, p_Group))
     outfile = open(dataset, 'wb')
     pickle.dump(dict_to_ram, outfile)
     outfile.close()
@@ -158,11 +156,8 @@ def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, datase
 
 
 if __name__ == '__main__':
-    run_eval("adult-gender", 2)
-    # run_eval("adult-race", 10)
-    # run_eval("compass-race", 10)
-    # run_eval("compass-gender", 10)
-    # run_eval("dutch", 10)
+    run_eval("compass-gender", 3)
+    # run_eval("adult-gender", 10)
     # run_eval("bank", 10)
-    # run_eval("diabetes", 10)
     # run_eval("kdd", 10)
+
