@@ -29,14 +29,15 @@ import numpy as np
 from sklearn.base import is_classifier, ClassifierMixin, is_regressor
 from sklearn.ensemble import BaseEnsemble
 from sklearn.ensemble.forest import BaseForest
-from sklearn.externals import six
+import six
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import r2_score
 from sklearn.tree.tree import BaseDecisionTree, DTYPE, DecisionTreeClassifier
 from sklearn.utils.validation import has_fit_parameter, check_is_fitted, check_array, check_X_y, check_random_state
 
 __all__ = [
-    'AdaCostClassifier'
+    'AdaCostClassifier',
+    'AdaBoostRegressor',
 ]
 
 

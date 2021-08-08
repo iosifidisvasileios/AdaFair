@@ -16,12 +16,6 @@ def draw(weights):
          return choiceIndex
       choiceIndex += 1
 
-from scipy.optimize import minimize # for loss func minimization
-from multiprocessing import Process, Queue
-from collections import defaultdict
-from copy import deepcopy
-import matplotlib.pyplot as plt # for plotting stuff
-
 
 
 # normalize a distribution

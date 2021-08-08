@@ -29,7 +29,10 @@ import numpy as np
 from sklearn.base import is_classifier, ClassifierMixin, is_regressor
 from sklearn.ensemble import BaseEnsemble
 from sklearn.ensemble.forest import BaseForest
-from sklearn.externals import six
+# from sklearn.externals import six
+import six
+import sys
+sys.modules['sklearn.externals.six'] = six
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import r2_score
 from sklearn.tree.tree import BaseDecisionTree, DTYPE, DecisionTreeClassifier

@@ -1,5 +1,5 @@
 import math
-from utils import draw, normalize, sign
+from Competitors.utils import draw, normalize, sign
 import numpy as np
 #from weaklearners.decisionstump import buildDecisionStump
 from sklearn.tree.tree import BaseDecisionTree, DTYPE, DecisionTreeClassifier
