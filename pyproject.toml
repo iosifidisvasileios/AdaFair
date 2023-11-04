@@ -10,7 +10,10 @@ packages = [{include = "src"},  { include = "DataPreprocessing" },  { include = 
 
 [tool.poetry.dependencies]
 python = "^3.8"
-
+scikit-learn = "^1.3.2"
+numpy = "^1.24.4"
+scipy = "^1.9.3"
+threadpoolctl = "^3.2.0"
 
 [build-system]
 requires = ["poetry-core"]
