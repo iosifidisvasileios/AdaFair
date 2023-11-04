@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "adafair"
 version = "0.1.0"
-description = "Fairness-aware adaptive boosting classifier. see paper: \"AdaFair: Cumulative Fairness Adaptive Boosting\""
-authors = ["iosifidisvasileios <billiosifidis@gmail.com>"]
+description = "Fairness-aware adaptive boosting classifier. See paper: \"AdaFair: Cumulative Fairness Adaptive Boosting\""
+authors = ["Dr. Vasileios Iosifidis <billiosifidis@gmail.com>"]
 license = "MIT License"
 readme = "README.md"
 packages = [{include = "src"},  { include = "DataPreprocessing" },  { include = "tests" }]
