@@ -15,29 +15,22 @@ SEED = 1234
 seed(SEED)
 np.random.seed(SEED)
 
+os.chdir("..")
 
-
-def load_adult(sa):
+def load_adult(sensitive_attribute):
 
 	FEATURES_CLASSIFICATION = ["workclass", "education", "Maritial-status", "occupation", "race", "sex", "country","age", "Capital-gain","Capital-loss","Hours-per-week"] #features to be used for classification
 	CONT_VARIABLES = ["age", "Capital-gain","Capital-loss","Hours-per-week"] # continuous features, will need to be handled separately from categorical features, categorical features will be encoded using one-hot
 	CLASS_FEATURE = "Class-label" # the decision variable
-	SENSITIVE_ATTRS = [sa]
-
-
-	COMPAS_INPUT_FILE = "DataPreprocessing/adult.csv"
-
+	SENSITIVE_ATTRS = [sensitive_attribute]
 
 	# load the data and get some stats
-	df = pd.read_csv(COMPAS_INPUT_FILE)
+	df = pd.read_csv("DataPreprocessing/adult.csv")
 
 	# convert to np array
 	data = df.to_dict('list')
 	for k in data.keys():
 		data[k] = np.array(data[k])
-
-
-	""" Feature normalization and one hot encoding """
 
 	# convert class label 0 to -1
 	y = data[CLASS_FEATURE]
@@ -75,34 +68,14 @@ def load_adult(sa):
 				for k in lb.classes_: # non-binary categorical features, need to add the names for each cat
 					feature_names.append(attr + "_" + str(k))
 
-
 	# convert the sensitive feature to 1-d array
 	x_control = dict(x_control)
 	for k in x_control.keys():
 		assert(x_control[k].shape[1] == 1) # make sure that the sensitive feature is binary after one hot encoding
 		x_control[k] = np.array(x_control[k]).flatten()
 
-	# sys.exit(1)
-
-	"""permute the date randomly"""
-	# perm = range(0,X.shape[0])
-	# shuffle(perm)
-	# X = X[perm]
-	# y = y[perm]
-	# for k in x_control.keys():
-	# 	x_control[k] = x_control[k][perm]
-
-
-	# X = ut.add_intercept(X)
-
-	# feature_names = ["intercept"] + feature_names
-	# assert(len(feature_names) == X.shape[1])
-	# print "Features we will be using for classification are:", feature_names, "\n"
-	# print x_control
-
 	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0, x_control
 
 
-# Data_type = 1
-# X, y, x_control = load_adult_gender()
-# sensitive_attrs = x_control.keys()
+if __name__ == "__main__":
+	load_adult("race")
