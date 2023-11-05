@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "adafair"
-version = "0.1.3"
+version = "0.1.4"
 description = "Fairness-aware adaptive boosting classifier. See paper: \"AdaFair: Cumulative Fairness Adaptive Boosting\""
 authors = ["Dr. Vasileios Iosifidis <billiosifidis@gmail.com>"]
 license = "MIT License"
