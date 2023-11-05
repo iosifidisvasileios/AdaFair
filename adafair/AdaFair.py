@@ -105,7 +105,7 @@ class BaseWeightBoosting(BaseEnsemble, metaclass=ABCMeta):
 
 		self.X_valid = self.y_valid = None
 		if self.use_validation:
-			X, self.X_valid, y, self.y_valid = train_test_split(X, y, test_size=0.3, shuffle=True, stratify=y)
+			X, self.X_valid, y, self.y_valid = train_test_split(X, y, test_size=0.2, shuffle=True, stratify=y)
 
 		if sample_weight is None:
 			# Initialize weights to 1 / n_samples
@@ -422,12 +422,11 @@ class AdaFair(BaseWeightBoosting, ClassifierMixin):
 	             base_estimator=None,
 	             n_estimators=50,
 	             learning_rate=1.,
-	             cumul=True,
 	             algorithm='SAMME',
 	             random_state=None,
 	             saIndex=None, saValue=None,
 	             CSB="CSB2",
-	             c=1, use_validation=False, proba=False
+	             trade_off_c=1, use_validation=False
 	             ):
 
 		super(AdaFair, self).__init__(
@@ -438,18 +437,15 @@ class AdaFair(BaseWeightBoosting, ClassifierMixin):
 
 		self.cost_protected_positive = 1
 		self.cost_non_protected_positive = 1
-		self.cumul = cumul
 		self.cost_protected_negative = 1
 		self.cost_non_protected_negative = 1
 
-		self.c = c
+		self.c = trade_off_c
 		self.saIndex = saIndex
 		self.saValue = saValue
 		self.algorithm = algorithm
 
 		self.use_validation = use_validation
-		self.use_proba = proba
-		self.costs = []
 
 		self.csb = CSB
 
@@ -564,58 +560,6 @@ class AdaFair(BaseWeightBoosting, ClassifierMixin):
 		elif diff_tpr < 0:
 			self.cost_non_protected_negative = (1 + abs(diff_tnr))
 
-		# print str(self.cost_protected_positive) + "," + str(self.cost_non_protected_positive)  + "," + str(self.cost_protected_negative)  + "," + str(self.cost_non_protected_negative)
-		self.costs.append(str(diff_tpr) + "," + str(diff_tnr))
-
-		return abs((tpr_non_protected - tpr_protected)) + abs((tnr_non_protected - tnr_protected))
-
-	def measure_fairness_for_visualization(self, data, labels, predictions):
-
-		tp_protected = 0.
-		tn_protected = 0.
-		fp_protected = 0.
-		fn_protected = 0.
-
-		tp_non_protected = 0.
-		tn_non_protected = 0.
-		fp_non_protected = 0.
-		fn_non_protected = 0.
-		for idx, val in enumerate(data):
-			# protrcted population
-			if val[self.saIndex] == self.saValue:
-				# correctly classified
-				if labels[idx] == predictions[idx]:
-					if labels[idx] == 1:
-						tp_protected += 1
-					else:
-						tn_protected += 1
-				# misclassified
-				else:
-					if labels[idx] == 1:
-						fn_protected += 1
-					else:
-						fp_protected += 1
-
-			else:
-				# correctly classified
-				if labels[idx] == predictions[idx]:
-					if labels[idx] == 1:
-						tp_non_protected += 1
-					else:
-						tn_non_protected += 1
-				# misclassified
-				else:
-					if labels[idx] == 1:
-						fn_non_protected += 1
-					else:
-						fp_non_protected += 1
-
-		tpr_protected = tp_protected / (tp_protected + fn_protected)
-		tnr_protected = tn_protected / (tn_protected + fp_protected)
-
-		tpr_non_protected = tp_non_protected / (tp_non_protected + fn_non_protected)
-		tnr_non_protected = tn_non_protected / (tn_non_protected + fp_non_protected)
-
 		return abs((tpr_non_protected - tpr_protected)) + abs((tnr_non_protected - tnr_protected))
 
 	def _boost_discrete(self, iboost, X, y, sample_weight, random_state):
@@ -660,11 +604,8 @@ class AdaFair(BaseWeightBoosting, ClassifierMixin):
 			self.predictions_array_valid += (y_valid_predict == self.classes_[:, np.newaxis]).T * alpha
 
 			if iboost != 0:
-				if self.cumul:
-					fairness = self.calculate_fairness(self.X_valid, self.y_valid, self.classes_.take(
-						np.argmax(self.predictions_array_valid, axis=1)))
-				else:
-					fairness = self.calculate_fairness(self.X_valid, self.y_valid, y_valid_predict)
+				fairness = self.calculate_fairness(self.X_valid, self.y_valid, self.classes_.take(
+					np.argmax(self.predictions_array_valid, axis=1)))
 			else:
 				fairness = 1
 
@@ -678,11 +619,7 @@ class AdaFair(BaseWeightBoosting, ClassifierMixin):
 			cumulative_error = 1 - (float(tp) + float(tn)) / (tp + tn + fp + fn)
 		else:
 			if iboost != 0:
-				if self.cumul:
-					fairness = self.calculate_fairness(X, y,
-					                                   self.classes_.take(np.argmax(self.predictions_array, axis=1)))
-				else:
-					fairness = self.calculate_fairness(X, y, y_predict)
+				fairness = self.calculate_fairness(X, y, self.classes_.take(np.argmax(self.predictions_array, axis=1)))
 			else:
 				fairness = 1
 
@@ -778,11 +715,8 @@ class AdaFair(BaseWeightBoosting, ClassifierMixin):
 		n_classes = self.n_classes_
 		classes = self.classes_[:, np.newaxis]
 
-		if self.use_proba:
-			pred = sum(estimator.predict_proba(X) * w for estimator, w in zip(self.estimators_, self.estimator_alphas_))
-		else:
-			pred = sum((estimator.predict(X) == classes).T * w for estimator, w in
-			           zip(self.estimators_, self.estimator_alphas_))
+		pred = sum((estimator.predict(X) == classes).T * w for estimator, w in
+		           zip(self.estimators_, self.estimator_alphas_))
 		pred /= self.estimator_alphas_.sum()
 
 		if n_classes == 2:

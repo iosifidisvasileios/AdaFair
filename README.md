@@ -6,6 +6,8 @@ Preprint available at : https://lnkd.in/eARuqFDe
 The repository has been updated. More analytically, the sequence selection of weak learners (\theta parameter) is not performed on the training set rather on a validation set.
 In addition, two fairness notions, namely "statistical parity" and "equal opportunity" have been employed by AdaFair (AdaFairSP.py and AdaFairEQOP.py, respectively).
 
+The github repository link can be found ["here"](https://github.com/iosifidisvasileios/AdaFair). Jupyter notebook is provided on how to run the code :)
+
 If you use this paper, please do not forget to cite it:
 
 @inproceedings{iosifidis2019adafair,

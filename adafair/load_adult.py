@@ -15,7 +15,7 @@ SEED = 1234
 seed(SEED)
 np.random.seed(SEED)
 
-os.chdir("..")
+# os.chdir("..")
 
 def load_adult(sensitive_attribute):
 
@@ -25,7 +25,7 @@ def load_adult(sensitive_attribute):
 	SENSITIVE_ATTRS = [sensitive_attribute]
 
 	# load the data and get some stats
-	df = pd.read_csv("DataPreprocessing/adult.csv")
+	df = pd.read_csv("data/adult.csv")
 
 	# convert to np array
 	data = df.to_dict('list')
@@ -68,13 +68,7 @@ def load_adult(sensitive_attribute):
 				for k in lb.classes_: # non-binary categorical features, need to add the names for each cat
 					feature_names.append(attr + "_" + str(k))
 
-	# convert the sensitive feature to 1-d array
-	x_control = dict(x_control)
-	for k in x_control.keys():
-		assert(x_control[k].shape[1] == 1) # make sure that the sensitive feature is binary after one hot encoding
-		x_control[k] = np.array(x_control[k]).flatten()
-
-	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0, x_control
+	return X, y, feature_names.index(SENSITIVE_ATTRS[0]), 0
 
 
 if __name__ == "__main__":
