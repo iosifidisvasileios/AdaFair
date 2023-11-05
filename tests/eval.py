@@ -17,7 +17,8 @@ matplotlib.use('Agg')
 import sys
 
 from adafair import AdaFair
-# sys.path.insert(0, 'AdaFair')
+from adafair import AdaFairEQOP
+from adafair import AdaFairSP
 os.chdir("..")
 import time
 from adafair.load_adult import load_adult
@@ -241,9 +242,9 @@ def run_eval(dataset, iterations):
     suffixes = ['AdaFair CSB2', 'AdaFair CSB1' ]
 
     if dataset == "adult-gender":
-        X, y, sa_index, p_Group, x_control = load_adult("sex")
+        X, y, sa_index, p_Group = load_adult("sex")
     elif dataset == "adult-race":
-        X, y, sa_index, p_Group, x_control = load_adult("race")
+        X, y, sa_index, p_Group = load_adult("race")
     else:
         exit(1)
     create_temp_files(dataset, suffixes)
@@ -269,7 +270,7 @@ def run_eval(dataset, iterations):
                                                                            X_test, copy.deepcopy(y_train),
                                                                            y_test, sa_index, p_Group,
                                                                            dataset + suffixes[proc],
-                                                                           mutex[proc],proc, 20, 1)))
+                                                                           mutex[proc],proc, 100, 1)))
 
             break
 
@@ -293,9 +294,10 @@ def run_eval(dataset, iterations):
 
 def train_classifier(X_train, X_test, y_train, y_test, sa_index, p_Group, dataset, mutex, mode, base_learners, c):
     if mode == 0:
-        classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2", trade_off=c)
+        classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2", trade_off_c=c)
     elif mode == 1:
-        classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB1", trade_off=c)
+        classifier = AdaFair(n_estimators=base_learners, saIndex=sa_index, saValue=p_Group, CSB="CSB2", trade_off_c=c)
+
     classifier.fit(X_train, y_train)
 
     y_pred_probs = classifier.predict_proba(X_test)[:, 1]

@@ -34,7 +34,6 @@ DTYPE = np.float64
 sys.modules['sklearn.externals.six'] = six
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.metrics import r2_score
-from sklearn.model_selection import train_test_split
 from sklearn.tree import BaseDecisionTree, DecisionTreeClassifier
 from sklearn.utils.validation import has_fit_parameter, check_is_fitted, check_array, check_X_y, check_random_state
 
@@ -63,14 +62,6 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             n_estimators=n_estimators,
             estimator_params=estimator_params)
 
-        self.W_pos = 0.
-        self.W_neg = 0.
-        self.W_dp = 0.
-        self.W_fp = 0.
-        self.W_dn = 0.
-        self.W_fn = 0.
-        self.performance = []
-        self.objective = []
         self.learning_rate = learning_rate
         self.random_state = random_state
         self.tuning_learners = []
@@ -100,21 +91,18 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             Returns self.
         """
         # Check parameters
-        self.weight_list = []
         if self.learning_rate <= 0:
             raise ValueError("learning_rate must be greater than zero")
 
         if (self.base_estimator is None or
-                isinstance(self.base_estimator, (BaseDecisionTree,
-                                                 BaseForest))):
+                isinstance(self.base_estimator, (BaseDecisionTree, ))):
             dtype = DTYPE
             accept_sparse = 'csc'
         else:
             dtype = None
             accept_sparse = ['csr', 'csc']
 
-        X, y = check_X_y(X, y, accept_sparse=accept_sparse, dtype=dtype,
-                         y_numeric=is_regressor(self))
+        X, y = check_X_y(X, y, accept_sparse=accept_sparse, dtype=dtype, y_numeric=is_regressor(self))
 
         if sample_weight is None:
             # Initialize weights to 1 / n_samples
@@ -134,9 +122,6 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         # Check parameters
         self._validate_estimator()
 
-        if self.debug:
-            self.conf_scores = []
-
         # Clear any previous fit results
         self.estimators_ = []
 
@@ -144,17 +129,10 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         self.estimator_fairness_ = np.ones(self.n_estimators, dtype=np.float64)
 
         random_state = check_random_state(self.random_state)
-        if self.debug:
-            print("iteration, alpha , positives , negatives , dp , fp , dn , fn")
 
         old_weights_sum = np.sum(sample_weight)
-        pos, neg, dp, fp, dn, fn = self.calculate_weights(X, y, sample_weight)
-        self.predictions_array = np.zeros([X.shape[0], 2])
 
-        if self.debug:
-            self.weight_list.append(
-                'init' + "," + str(0) + "," + str(pos) + ", " + str(neg) + ", " + str(dp) + ", " + str(
-                    fp) + ", " + str(dn) + ", " + str(fn))
+        self.predictions_array = np.zeros([X.shape[0], 2])
 
         for iboost in range(self.n_estimators):
             # Boosting step
@@ -169,8 +147,6 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
                 break
 
             self.tuning_learners.append(self.c * balanced_error + (1 - self.c) * standard_error + fairness)
-
-            # self.estimator_alphas_[iboost] = alpha
 
             # Stop if error is zero
             if error == 0.5:
@@ -187,47 +163,15 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
                 # Normalize
                 sample_weight *= multiplier
 
-
-            if self.debug:
-                pos, neg, dp, fp, dn, fn = self.calculate_weights(X, y, sample_weight)
-                self.weight_list.append(
-                    str(iboost) + "," + str(alpha) + "," + str(pos) + ", " + str(neg) + ", " + str(dp) + ", " + str(
-                        fp) + ", " + str(dn) + ", " + str(fn))
-
-            # self.W_pos += pos / self.n_estimators
-            # self.W_neg += neg / self.n_estimators
-            # self.W_dp += dp / self.n_estimators
-            # self.W_fp += fp / self.n_estimators
-            # self.W_dn += dn / self.n_estimators
-            # self.W_fn += fn / self.n_estimators
-
             old_weights_sum = np.sum(sample_weight)
 
         best_theta = self.tuning_learners.index(min(self.tuning_learners))
         self.theta = best_theta + 1
 
-        if self.debug:
-            print("best #weak learners = " + str(self.theta))
         self.estimators_ = self.estimators_[:self.theta]
         self.estimator_alphas_ = self.estimator_alphas_[:self.theta]
 
-        if self.debug:
-            self.get_confidence_scores(X)
-        # print("best #weak learners = " + str(self.theta))
-
         return self
-
-    def get_weights_over_iterations(self, ):
-        return self.weight_list[self.theta]
-
-    def get_confidence_scores(self, X):
-        self.conf_scores = self.decision_function(X)
-
-    def get_initial_weights(self):
-        return self.weight_list[0]
-
-    def get_weights(self, ):
-        return [self.W_pos, self.W_neg, self.W_dp, self.W_fp, self.W_dn, self.W_fn]
 
     @abstractmethod
     def _boost(self, iboost, X, y, sample_weight, random_state):
@@ -326,64 +270,13 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
     def _validate_X_predict(self, X):
         """Ensure that X is in the proper format"""
         if (self.base_estimator is None or
-                isinstance(self.base_estimator,
-                           (BaseDecisionTree, BaseForest))):
+                isinstance(self.base_estimator, (BaseDecisionTree, ))):
             X = check_array(X, accept_sparse='csr', dtype=DTYPE)
 
         else:
             X = check_array(X, accept_sparse=['csr', 'csc', 'coo'])
 
         return X
-
-    def calculate_weights(self, data, labels, sample_weight):
-
-        protected_positive = 0.
-        non_protected_positive = 0.
-
-        protected_negative = 0.
-        non_protected_negative = 0.
-
-        for idx, val in enumerate(data):
-            # protrcted population
-            if val[self.saIndex] == self.saValue:
-                # protected group
-                if labels[idx] == 1:
-                    protected_positive += sample_weight[idx]  # /len(sample_weight)
-                else:
-                    protected_negative += sample_weight[idx]  # /len(sample_weight)
-            else:
-                # correctly classified
-                if labels[idx] == 1:
-                    non_protected_positive += sample_weight[idx]  # /len(sample_weight)
-                else:
-                    non_protected_negative += sample_weight[idx]  # /len(sample_weight)
-
-        return [protected_positive + non_protected_positive,
-                protected_negative + non_protected_negative,
-                protected_positive,
-                non_protected_positive,
-                protected_negative,
-                non_protected_negative]
-
-
-def _samme_proba(estimator, n_classes, X):
-    """Calculate algorithm 4, step 2, equation c) of Zhu et al [1].
-
-    References
-    ----------
-    .. [1] J. Zhu, H. Zou, S. Rosset, T. Hastie, "Multi-class AdaBoost", 2009.
-
-    """
-    proba = estimator.predict_proba(X)
-
-    # Displace zero probabilities so the log is defined.
-    # Also fix negative elements which may occur with
-    # negative sample weights.
-    proba[proba < np.finfo(proba.dtype).eps] = np.finfo(proba.dtype).eps
-    log_proba = np.log(proba)
-
-    return (n_classes - 1) * (log_proba - (1. / n_classes)
-                              * log_proba.sum(axis=1)[:, np.newaxis])
 
 
 class AdaFairEQOP(BaseWeightBoosting, ClassifierMixin):
@@ -467,11 +360,10 @@ class AdaFairEQOP(BaseWeightBoosting, ClassifierMixin):
                  n_estimators=50,
                  learning_rate=1.,
                  algorithm='SAMME',
-                 cumul=True,
                  random_state=None,
                  saIndex=None, saValue=None,
-                 debug=False, CSB="CSB2",
-                 X_test=None, y_test=None, c=1):
+                 CSB="CSB2",
+                 trade_off_c=1):
 
         super(AdaFairEQOP, self).__init__(
             base_estimator=base_estimator,
@@ -481,18 +373,12 @@ class AdaFairEQOP(BaseWeightBoosting, ClassifierMixin):
 
         self.cost_protected_positive = 1
         self.cost_non_protected_positive = 1
-        self.cumul = cumul
-        self.c = c
+        self.c = trade_off_c
         self.saIndex = saIndex
         self.saValue = saValue
         self.algorithm = algorithm
 
-        self.costs = []
-
-        self.debug = debug
         self.csb = CSB
-        self.X_test = X_test
-        self.y_test = y_test
 
     def fit(self, X, y, sample_weight=None):
         """Build a boosted classifier from the training set (X, y).
@@ -572,9 +458,7 @@ class AdaFairEQOP(BaseWeightBoosting, ClassifierMixin):
                         fn_non_protected += 1
 
         tpr_protected = tp_protected / (tp_protected + fn_protected)
-
         tpr_non_protected = tp_non_protected / (tp_non_protected + fn_non_protected)
-
         diff_tpr = tpr_non_protected - tpr_protected
 
         self.cost_protected_positive = self.cost_non_protected_positive = 1
@@ -584,58 +468,7 @@ class AdaFairEQOP(BaseWeightBoosting, ClassifierMixin):
         elif diff_tpr < 0:
             self.cost_non_protected_positive = (1 + abs(diff_tpr))
 
-        self.costs.append(diff_tpr)
-
         return abs(tpr_non_protected - tpr_protected)
-
-    def measure_fairness_for_visualization(self, data, labels, predictions):
-
-        tp_protected = 0.
-        tn_protected = 0.
-        fp_protected = 0.
-        fn_protected = 0.
-
-        tp_non_protected = 0.
-        tn_non_protected = 0.
-        fp_non_protected = 0.
-        fn_non_protected = 0.
-        for idx, val in enumerate(data):
-            # protrcted population
-            if val[self.saIndex] == self.saValue:
-                # correctly classified
-                if labels[idx] == predictions[idx]:
-                    if labels[idx] == 1:
-                        tp_protected += 1
-                    else:
-                        tn_protected += 1
-                # misclassified
-                else:
-                    if labels[idx] == 1:
-                        fn_protected += 1
-                    else:
-                        fp_protected += 1
-
-            else:
-                # correctly classified
-                if labels[idx] == predictions[idx]:
-                    if labels[idx] == 1:
-                        tp_non_protected += 1
-                    else:
-                        tn_non_protected += 1
-                # misclassified
-                else:
-                    if labels[idx] == 1:
-                        fn_non_protected += 1
-                    else:
-                        fp_non_protected += 1
-
-        tpr_protected = tp_protected / (tp_protected + fn_protected)
-        tnr_protected = tn_protected / (tn_protected + fp_protected)
-
-        tpr_non_protected = tp_non_protected / (tp_non_protected + fn_non_protected)
-        tnr_non_protected = tn_non_protected / (tn_non_protected + fp_non_protected)
-
-        return abs((tpr_non_protected - tpr_protected)) + abs((tnr_non_protected - tnr_protected))
 
     def _boost_discrete(self, iboost, X, y, sample_weight, random_state):
         """Implement a single boost using the SAMME discrete algorithm."""
@@ -657,7 +490,7 @@ class AdaFairEQOP(BaseWeightBoosting, ClassifierMixin):
         # Stop if classification is perfect
         if estimator_error <= 0:
             return sample_weight, 1., 0.
-        n_classes = self.n_classes_
+
         # Stop if the error is at least as bad as random guessing
         if estimator_error >= 1. - (1. / n_classes):
             self.estimators_.pop(-1)
@@ -675,10 +508,7 @@ class AdaFairEQOP(BaseWeightBoosting, ClassifierMixin):
         self.predictions_array += (y_predict == self.classes_[:, np.newaxis]).T * alpha
 
         if iboost != 0:
-            if self.cumul:
-                fairness = self.calculate_fairness(X, y, self.classes_.take(np.argmax(self.predictions_array, axis=1)))
-            else:
-                fairness = self.calculate_fairness(X, y, y_predict)
+            fairness = self.calculate_fairness(X, y, self.classes_.take(np.argmax(self.predictions_array, axis=1)))
         else:
             fairness = 1
 
@@ -712,41 +542,7 @@ class AdaFairEQOP(BaseWeightBoosting, ClassifierMixin):
                     elif self.csb == "CSB1":
                         sample_weight[idx] *= np.exp(alpha )
 
-        # if self.debug:
-        #     y_predict = self.predict(X)
-        #     incorrect = y_predict != y
-        #     train_error = np.mean(np.average(incorrect, axis=0))
-        #     train_bal_error = 1 - sklearn.metrics.balanced_accuracy_score(y, y_predict)
-        #     train_fairness = self.measure_fairness_for_visualization(X, y, y_predict)
-        #
-        #     test_error = 0
-        #     test_bal_error = 0
-        #     test_fairness = 0
-        #     if self.X_test is not None:
-        #         y_predict = self.predict(self.X_test)
-        #         incorrect = y_predict != self.y_test
-        #         test_error = np.mean(np.average(incorrect, axis=0))
-        #         test_bal_error = 1 - sklearn.metrics.balanced_accuracy_score(self.y_test, y_predict)
-        #         test_fairness = self.measure_fairness_for_visualization(self.X_test, self.y_test, y_predict)
-        #
-        #     self.objective.append(train_error * (1 - self.c) + train_bal_error * self.c + train_fairness)
-        #     self.performance.append(str(iboost) + "," + str(train_error) + ", " + str(train_bal_error) + ", " + str(
-        #         train_fairness) + "," + str(test_error) + ", " + str(test_bal_error) + ", " + str(test_fairness))
-        #     print(str(iboost) + "," + str(train_error) + ", " + str(train_bal_error) + ", " + str(
-        #         train_fairness) + "," + str(test_error) + ", " + str(test_bal_error) + ", " + str(test_fairness))
-
         return sample_weight, alpha, estimator_error, fairness, cumulative_balanced_error, cumulative_error
-
-    def get_performance_over_iterations(self):
-        return self.performance
-
-    #
-    def get_objective(self):
-        return self.objective
-
-    #
-    # def get_weights_over_iterations(self):
-    #     return self.weight_list[self.theta]
 
     def predict(self, X):
         """Predict classes for X.
@@ -797,7 +593,7 @@ class AdaFairEQOP(BaseWeightBoosting, ClassifierMixin):
 
         pred = sum(
             (estimator.predict(X) == classes).T * w for estimator, w in zip(self.estimators_, self.estimator_alphas_))
-        # pred = sum(estimator.predict_proba(X) * w for estimator, w,  in zip(self.estimators_, self.estimator_alphas_))
+
         pred /= self.estimator_alphas_.sum()
         if n_classes == 2:
             pred[:, 0] *= -1
